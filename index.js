@@ -4,6 +4,7 @@ const cors = require('cors');
 const careerRouter = require('./routes/careerRoutes');
 const adsRouter = require('./routes/adsRoutes');
 const employeeRouter = require('./routes/employeeRoutes');
+const propertyRouter = require('./routes/propertyRoutes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.get('/',(req,res)=>{
 app.use("/api/v1",careerRouter);
 app.use("/api/v1",adsRouter);
 app.use("/api/v1",employeeRouter);
+app.use("/api/v1",propertyRouter);
 
 const port = 3000;
 
