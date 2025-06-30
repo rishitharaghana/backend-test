@@ -73,6 +73,24 @@ const getAllEMployeesByTypeSearch = async (req,res)=>{
                     );
                 });
                 if (userErr) throw userErr;
+                 const [activityErr, activityLogs] = await new Promise((resolve) => {
+                    const activitySql = `
+                    SELECT employee_id, created_date
+                    FROM employee_activity
+                    WHERE employee_id IN (${empPlaceholders})
+                    ORDER BY created_date DESC
+                `;
+                    pool.query(activitySql, employeeIds, (err, result) =>
+                    resolve([err, result])
+                    );
+                });
+                    if (activityErr) throw activityErr;
+                    const latestActivityMap = {};
+                    for (const log of activityLogs) {
+                        if (!latestActivityMap[log.employee_id]) {
+                        latestActivityMap[log.employee_id] = log.created_date;
+                        }
+                    }
                  const employeeUserMap = {};
                     users.forEach((user) => {
                         const empId = user.assigned_emp_id;
