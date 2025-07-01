@@ -4,13 +4,14 @@ const util = require('util');
 const { createMulterInstance } = require('../config/multerConfig');
 const path = require('path');
 
+
 const uploadDir = 'uploads/';
 const allowedTypes = {
     'brochure': ['.pdf'],
     'price_sheet': ['.pdf'],
     'floor_plan': ['.png', '.jpg', '.jpeg', '.pdf']
 };
-const upload = createMulterInstance(uploadDir, allowedTypes, { fileSize: 20 * 1024 * 1024 });
+const upload = createMulterInstance(uploadDir, allowedTypes, { fileSize: 20 * 1024 * 1024 }); 
 
 const queryAsync = util.promisify(pool.query).bind(pool);
 
@@ -21,29 +22,55 @@ const insertProperty = async (req, res) => {
         { name: 'floor_plan', maxCount: 4 }
     ])(req, res, async (err) => {
         if (err) {
+          
             return res.status(400).json({ error: 'File upload error: ' + err.message });
         }
 
-        const { project_name, property_type, property_subtype, builder_name, state, city, locality, sizes, around_this } = req.body;
-        if (!project_name || !property_type || !property_subtype || !builder_name || !state || !city || !locality) {
+        
+
+        const { project_name, property_type, property_subtype, builder_name, state, city, locality, sizes, around_this, construction_status,
+            upcoming_project, posted_by, possession_end_date, user_id } = req.body;
+        if (!project_name || !property_type || !property_subtype || !builder_name || !state || !city || !locality ||
+            !construction_status || !upcoming_project || !posted_by || !user_id) {
             return res.status(400).json({ error: 'Missing required property fields' });
         }
+        if (construction_status !== 'Ready to Move' && construction_status !== 'Under Construction') {
+            return res.status(400).json({ error: 'Invalid construction_status value' });
+        }
+        if (construction_status === 'Under Construction') {
+            if (!possession_end_date) {
+                return res.status(400).json({ error: 'possession_end_date is required for Under Construction' });
+            }
+            if (!moment(possession_end_date, 'DD-MM-YYYY', true).isValid()) {
+                return res.status(400).json({ error: 'possession_end_date must be in DD-MM-YYYY format (e.g., 01-07-2025)' });
+            }
+        } else if (construction_status === 'Ready to Move' && possession_end_date) {
+            return res.status(400).json({ error: 'possession_end_date must be null for Ready to Move' });
+        }
+        if (upcoming_project !== 'Yes' && upcoming_project !== 'No') {
+            return res.status(400).json({ error: 'Invalid upcoming_project value' });
+        }
+        if (isNaN(parseInt(user_id)) || isNaN(parseInt(posted_by))) {
+            return res.status(400).json({ error: 'user_id and posted_by must be valid integers' });
+        }
 
-        // Get the base directory to strip from the full path
         const baseDir = path.join(__dirname, '..');
-
-        // Transform full paths to relative paths
         const brochure = req.files['brochure'] ? path.relative(baseDir, req.files['brochure'][0].path) : null;
         const price_sheet = req.files['price_sheet'] ? path.relative(baseDir, req.files['price_sheet'][0].path) : null;
         const floor_plans = req.files['floor_plan'] ? req.files['floor_plan'].map(file => path.relative(baseDir, file.path)) : [];
 
         try {
             await queryAsync('START TRANSACTION');
+            const currentTimestamp = moment().format('YYYY-MM-DD HH:mm:ss');
+            const formattedPossessionDate = possession_end_date
+                ? moment(possession_end_date, 'DD-MM-YYYY').format('YYYY-MM-DD')
+                : null;
             const propertyResult = await queryAsync(
                 `INSERT INTO property (
                     project_name, property_type, property_subtype, builder_name, 
-                    state, city, locality, brochure, price_sheet
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    state, city, locality, brochure, price_sheet, 
+                    construction_status, upcoming_project, posted_by, possession_end_date, created_date, user_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     project_name,
                     property_type,
@@ -53,7 +80,13 @@ const insertProperty = async (req, res) => {
                     city,
                     locality,
                     brochure,
-                    price_sheet
+                    price_sheet,
+                    construction_status,
+                    upcoming_project,
+                    parseInt(posted_by),
+                    formattedPossessionDate,
+                    currentTimestamp,
+                    parseInt(user_id)
                 ]
             );
             const property_id = propertyResult.insertId;
@@ -66,9 +99,8 @@ const insertProperty = async (req, res) => {
             }
             if (Array.isArray(sizesArray) && sizesArray.length > 0) {
                 if (sizesArray.length !== floor_plans.length) {
-                    throw new Error('Number of floor_plan files must match number of sizes entries');
+                    throw new Error(`Number of floor_plan files (${floor_plans.length}) must match number of sizes entries (${sizesArray.length})`);
                 }
-
                 for (let i = 0; i < sizesArray.length; i++) {
                     const size = sizesArray[i];
                     if (
@@ -85,7 +117,7 @@ const insertProperty = async (req, res) => {
                                 parseFloat(size.build_up_area).toString(),
                                 parseFloat(size.carpet_area).toString(),
                                 floor_plans[i],
-                                moment().format('YYYY-MM-DD HH:mm:ss')
+                                currentTimestamp
                             ]
                         );
                     } else {
@@ -100,7 +132,6 @@ const insertProperty = async (req, res) => {
             } catch (e) {
                 throw new Error('Invalid around_this JSON format');
             }
-
             if (Array.isArray(aroundThisArray) && aroundThisArray.length > 0) {
                 for (let place of aroundThisArray) {
                     if (
@@ -115,7 +146,7 @@ const insertProperty = async (req, res) => {
                                 property_id,
                                 place.title,
                                 parseFloat(place.distance).toString(),
-                                moment().format('YYYY-MM-DD HH:mm:ss')
+                                currentTimestamp
                             ]
                         );
                     } else {
@@ -129,7 +160,6 @@ const insertProperty = async (req, res) => {
                 message: 'Property inserted successfully',
                 property_id
             });
-
         } catch (error) {
             await queryAsync('ROLLBACK');
             res.status(500).json({ error: 'Failed to insert property: ' + error.message });
@@ -137,14 +167,23 @@ const insertProperty = async (req, res) => {
     });
 };
 
+
+
 const getPropertyById = async (req, res) => {
-    const { id } = req.params;
+    const { property_id, user_id } = req.query; 
+
+    if (!property_id || isNaN(parseInt(property_id))) {
+        return res.status(400).json({ error: 'Valid property_id is required' });
+    }
+    if (!user_id || isNaN(parseInt(user_id))) {
+        return res.status(400).json({ error: 'Valid user_id is required' });
+    }
 
     try {
-        // Fetch property details
+       
         const propertyResult = await queryAsync(
-            `SELECT * FROM property WHERE property_id = ?`,
-            [id]
+            `SELECT * FROM property WHERE property_id = ? AND user_id = ?`,
+            [property_id, user_id] 
         );
 
         if (propertyResult.length === 0) {
@@ -154,16 +193,16 @@ const getPropertyById = async (req, res) => {
         // Fetch associated sizes
         const sizesResult = await queryAsync(
             `SELECT * FROM sizes WHERE property_id = ?`,
-            [id]
+            [property_id]
         );
 
-        // Fetch associated around_this
+       
         const aroundThisResult = await queryAsync(
             `SELECT * FROM around_this WHERE property_id = ?`,
-            [id]
+            [property_id]
         );
 
-        // Organize the data
+        
         const property = {
             ...propertyResult[0],
             sizes: sizesResult.map(row => ({
@@ -186,17 +225,22 @@ const getPropertyById = async (req, res) => {
 };
 
 const getAllProperties = async (req, res) => {
+    const { user_id } = req.query; 
+
+    if (!user_id || isNaN(parseInt(user_id))) {
+        return res.status(400).json({ error: 'Valid user_id is required' });
+    }
+
     try {
-       
         const propertiesResult = await queryAsync(
-            `SELECT * FROM property`
+            `SELECT * FROM property WHERE upcoming_project = ? AND user_id = ?`,
+            ['No', user_id]
         );
 
         if (propertiesResult.length === 0) {
             return res.status(200).json({ message: 'No properties found', data: [] });
         }
 
-       
         const sizesResult = await queryAsync(
             `SELECT * FROM sizes`
         );
@@ -204,7 +248,6 @@ const getAllProperties = async (req, res) => {
             `SELECT * FROM around_this`
         );
 
-       
         const sizesMap = new Map();
         sizesResult.forEach(row => {
             if (!sizesMap.has(row.property_id)) {
@@ -230,7 +273,6 @@ const getAllProperties = async (req, res) => {
             });
         });
 
-     
         const properties = propertiesResult.map(property => ({
             ...property,
             sizes: sizesMap.get(property.property_id) || [],
@@ -243,21 +285,66 @@ const getAllProperties = async (req, res) => {
     }
 };
 
-const getImage = async (req, res) => {
-    const filePath = req.params[0]; 
+const getUpcomingProperties = async (req, res) => {
+    const { user_id } = req.query;
 
-    const baseDir = path.join(__dirname, '..');
-    const fullPath = path.join(baseDir, filePath);
+    if (!user_id || isNaN(parseInt(user_id))) {
+        return res.status(400).json({ error: 'Valid user_id is required' });
+    }
 
     try {
-        if (fs.existsSync(fullPath)) {
-            res.sendFile(fullPath);
-        } else {
-            res.status(404).json({ error: 'Image not found' });
+        const propertiesResult = await queryAsync(
+            `SELECT * FROM property WHERE upcoming_project = ? AND user_id = ?`,
+            ['Yes', user_id]
+        );
+
+        if (propertiesResult.length === 0) {
+            return res.status(200).json({ message: 'No upcoming properties found', data: [] });
         }
+
+        const sizesResult = await queryAsync(
+            `SELECT * FROM sizes`
+        );
+        const aroundThisResult = await queryAsync(
+            `SELECT * FROM around_this`
+        );
+
+        const sizesMap = new Map();
+        sizesResult.forEach(row => {
+            if (!sizesMap.has(row.property_id)) {
+                sizesMap.set(row.property_id, []);
+            }
+            sizesMap.get(row.property_id).push({
+                build_up_area: row.build_up_area,
+                carpet_area: row.carpet_area,
+                floor_plan: row.floor_plan,
+                create_date: row.create_date
+            });
+        });
+
+        const aroundThisMap = new Map();
+        aroundThisResult.forEach(row => {
+            if (!aroundThisMap.has(row.property_id)) {
+                aroundThisMap.set(row.property_id, []);
+            }
+            aroundThisMap.get(row.property_id).push({
+                title: row.title,
+                distance: row.distance,
+                create_date: row.create_date
+            });
+        });
+
+        const properties = propertiesResult.map(property => ({
+            ...property,
+            sizes: sizesMap.get(property.property_id) || [],
+            around_this: aroundThisMap.get(property.property_id) || []
+        }));
+
+        res.status(200).json({ message: 'Upcoming properties fetched successfully', data: properties });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch image: ' + error.message });
+        res.status(500).json({ error: 'Failed to fetch upcoming properties: ' + error.message });
     }
 };
 
-module.exports = { insertProperty,getPropertyById,getAllProperties,getImage };
+
+module.exports = { insertProperty,getPropertyById,getAllProperties,getUpcomingProperties };
