@@ -7,6 +7,7 @@ const employeeRouter = require('./routes/employeeRoutes');
 const propertyRouter = require('./routes/propertyRoutes');
 const userRouter = require('./routes/userRoutes');
 const authRouter = require('./routes/authRoutes');
+const leadsRouter = require('./routes/leadsRoutes')
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use("/api/v1",employeeRouter);
 app.use("/api/v1",propertyRouter);
 app.use("/api/v1",authRouter);
 app.use("/api/v1",userRouter);
+app.use("/api/v1",leadsRouter);
 
 
 const port = 3000;
