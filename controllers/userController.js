@@ -278,52 +278,104 @@ const getUserTypesByBuilder = async (req, res) => {
 };
 
 const getUserTypesCount = async (req, res) => {
-    const { user_id, user_type,admin_user_id } = req.query;
+  const { user_id, user_type, admin_user_id } = req.query;
 
-    try {
-        let result;
+  try {
+    let result = [];
 
-        if (user_type && parseInt(user_type) === 2 && user_id && !isNaN(parseInt(user_id))) {
-           
-            const usersResult = await queryAsync(
-                `SELECT user_type, COUNT(*) as count 
-                 FROM crm_users 
-                 WHERE user_type NOT IN (1, 2) AND created_user_id = ? 
-                 GROUP BY user_type`,
-                [parseInt(user_id)]
-            );
-           
-            const projectsResult = await queryAsync(
-                `SELECT COUNT(*) as project_count FROM property 
-                 WHERE posted_by = ? AND user_id = ?`,
-                [parseInt(user_type), parseInt(user_id)]
-            );
-
-        
-            result = [
-                ...usersResult.map(row => ({ user_type: row.user_type, count: row.count })),
-                { user_type: 'projects', count: projectsResult[0].project_count }
-            ];
-        } else if (user_type && ([3, 4, 5, 6, 7].includes(parseInt(user_type))) && admin_user_id) {
-            const projectsResult = await queryAsync(
-                `SELECT COUNT(*) as project_count FROM property 
-                 WHERE user_id = ?`,
-                [parseInt(admin_user_id)]
-            );
-            result = [
-                { user_type: 'projects', count: projectsResult[0].project_count }
-            ];
-
-        } 
-
-        
-        const data = Array.isArray(result) ? result : result;
-
-        res.status(200).json({ message: 'Data fetched successfully', data });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch data: ' + error.message });
+    
+    if (!user_type || isNaN(parseInt(user_type))) {
+      return res.status(400).json({ error: "user_type is required and must be a valid integer" });
     }
+
+    const parsedUserType = parseInt(user_type);
+    const today = moment().format("YYYY-MM-DD");
+
+    if (parsedUserType === 2 && user_id && !isNaN(parseInt(user_id))) {
+      const parsedUserId = parseInt(user_id);
+
+      
+      const usersResult = await queryAsync(
+        `SELECT user_type, COUNT(*) as count 
+         FROM crm_users 
+         WHERE user_type NOT IN (1, 2) AND created_user_id = ? 
+         GROUP BY user_type`,
+        [parsedUserId]
+      );
+
+  
+      const projectsResult = await queryAsync(
+        `SELECT COUNT(*) as project_count 
+         FROM property 
+         WHERE posted_by = ? AND user_id = ?`,
+        [parsedUserType, parsedUserId]
+      );
+
+      // Get lead counts for New Leads, Today Leads, Today Follow Ups, Site Visit Done, Booked
+      const leadsResult = await queryAsync(
+        `SELECT 
+          SUM(CASE WHEN status_id = 1 AND booked = 'No' THEN 1 ELSE 0 END) as new_leads_count,
+          SUM(CASE WHEN created_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_leads_count,
+          SUM(CASE WHEN next_action IS NOT NULL AND updated_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_follow_ups_count,
+          SUM(CASE WHEN status_id = 5 AND booked = 'No' THEN 1 ELSE 0 END) as site_visit_done_count,
+          SUM(CASE WHEN booked = 'Yes' THEN 1 ELSE 0 END) as booked_count
+         FROM leads 
+         WHERE lead_added_user_type = ? AND lead_added_user_id = ?`,
+        [today, today, parsedUserType, parsedUserId]
+      );
+
+      result = [
+        ...usersResult.map((row) => ({ user_type: row.user_type, count: row.count })),
+        { user_type: "projects", count: projectsResult[0].project_count },
+        { user_type: "new_leads", count: leadsResult[0].new_leads_count || 0 },
+        { user_type: "today_leads", count: leadsResult[0].today_leads_count || 0 },
+        { user_type: "today_follow_ups", count: leadsResult[0].today_follow_ups_count || 0 },
+        { user_type: "site_visit_done", count: leadsResult[0].site_visit_done_count || 0 },
+        { user_type: "booked", count: leadsResult[0].booked_count || 0 },
+      ];
+    } else if ([3, 4, 5, 6, 7].includes(parsedUserType) && admin_user_id && !isNaN(parseInt(admin_user_id))) {
+      const parsedAdminUserId = parseInt(admin_user_id);
+
+      // Get project count
+      const projectsResult = await queryAsync(
+        `SELECT COUNT(*) as project_count 
+         FROM property 
+         WHERE user_id = ?`,
+        [parsedAdminUserId]
+      );
+
+     
+      const leadsResult = await queryAsync(
+        `SELECT 
+          SUM(CASE WHEN status_id = 1 AND booked = 'No' THEN 1 ELSE 0 END) as new_leads_count,
+          SUM(CASE WHEN created_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_leads_count,
+          SUM(CASE WHEN next_action IS NOT NULL AND updated_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_follow_ups_count,
+          SUM(CASE WHEN status_id = 5 AND booked = 'No' THEN 1 ELSE 0 END) as site_visit_done_count,
+          SUM(CASE WHEN booked = 'Yes' THEN 1 ELSE 0 END) as booked_count
+         FROM leads 
+         WHERE assigned_user_type = ? AND assigned_id = ?`,
+        [today, today, parsedUserType, parsedAdminUserId]
+      );
+
+      result = [
+        { user_type: "projects", count: projectsResult[0].project_count },
+        { user_type: "new_leads", count: leadsResult[0].new_leads_count || 0 },
+        { user_type: "today_leads", count: leadsResult[0].today_leads_count || 0 },
+        { user_type: "today_follow_ups", count: leadsResult[0].today_follow_ups_count || 0 },
+        { user_type: "site_visit_done", count: leadsResult[0].site_visit_done_count || 0 },
+        { user_type: "booked", count: leadsResult[0].booked_count || 0 },
+      ];
+    } else {
+      return res.status(400).json({ error: "Invalid user_type or missing required parameters" });
+    }
+
+    res.status(200).json({ message: "Data fetched successfully", data: result });
+  } catch (error) {
+    console.error("Error fetching user types count:", { error, queryParams: req.query });
+    res.status(500).json({ error: "Failed to fetch data: " + error.message });
+  }
 };
+
 
 
 module.exports = {insertCrmUser,updateUserStatus,getUserTypesByBuilder,getUserTypesCount}
