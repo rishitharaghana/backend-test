@@ -223,34 +223,33 @@ const updateUserStatus = async (req,res)=>{
 }
 
 const getUserTypesByBuilder = async (req, res) => {
-    let { id, user_type, created_user_id } = req.query;
+    let { admin_user_id, emp_user_id, emp_user_type } = req.query;
 
-    // Validate created_user_id
-    if (!created_user_id || isNaN(parseInt(created_user_id))) {
-        return res.status(400).json({ error: 'Valid created_user_id is required' });
+    // Validate admin_user_id
+    if (!admin_user_id || isNaN(parseInt(admin_user_id))) {
+        return res.status(400).json({ error: 'Valid admin_user_id is required' });
     }
 
     try {
         let query = `SELECT * FROM crm_users WHERE created_user_id = ?`;
-        let params = [parseInt(created_user_id)];
+        let params = [parseInt(admin_user_id)];
 
-        // Handle multiple user_types
-        if (user_type) {
-            const userTypesArray = user_type.split(',').map(type => parseInt(type.trim())).filter(n => !isNaN(n));
-            if (userTypesArray.length > 0) {
-                const placeholders = userTypesArray.map(() => '?').join(',');
-                query += ` AND user_type IN (${placeholders})`;
-                params.push(...userTypesArray);
+        // Handle emp_user_type filter
+        if (emp_user_type) {
+            const parsedEmpUserType = parseInt(emp_user_type.trim());
+            if (!isNaN(parsedEmpUserType)) {
+                query += ` AND user_type = ?`;
+                params.push(parsedEmpUserType);
             }
         }
 
-        // Handle multiple IDs
-        if (id) {
-            const idArray = id.split(',').map(i => parseInt(i.trim())).filter(n => !isNaN(n));
-            if (idArray.length > 0) {
-                const placeholders = idArray.map(() => '?').join(',');
+        // Handle emp_user_id filter
+        if (emp_user_id) {
+            const empUserIdArray = emp_user_id.split(',').map(i => parseInt(i.trim())).filter(n => !isNaN(n));
+            if (empUserIdArray.length > 0) {
+                const placeholders = empUserIdArray.map(() => '?').join(',');
                 query += ` AND id IN (${placeholders})`;
-                params.push(...idArray);
+                params.push(...empUserIdArray);
             }
         }
 

@@ -1,9 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 
-const careerRouter = require('./routes/careerRoutes');
-const adsRouter = require('./routes/adsRoutes');
-const employeeRouter = require('./routes/employeeRoutes');
+
 const propertyRouter = require('./routes/propertyRoutes');
 const userRouter = require('./routes/userRoutes');
 const authRouter = require('./routes/authRoutes');
@@ -41,9 +39,7 @@ app.get('/',(req,res)=>{
     res.send('Hello world');
 });
 
-app.use("/api/v1",careerRouter);
-app.use("/api/v1",adsRouter);
-app.use("/api/v1",employeeRouter);
+
 app.use("/api/v1",propertyRouter);
 app.use("/api/v1",authRouter);
 app.use("/api/v1",userRouter);
