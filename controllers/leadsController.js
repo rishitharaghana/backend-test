@@ -530,7 +530,55 @@ const getBookedLeads = async (req, res) => {
   }
 };
 
-module.exports = { getLeadUpdatesByLeadId };
+const getAllLeadSource = async (req, res) => {
+  try {
+    const results = await queryAsync("SELECT * FROM lead_source");
+    if (results.length === 0) {
+      return res.status(404).json({
+        status: "error",
+        message: "No lead sources found",
+      });
+    }
+
+    res.status(200).json({
+      status: "success",
+      results: results,
+    });
+  } catch (error) {
+    console.error("Error fetching lead sources:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to fetch lead sources",
+    });
+  }
+};
+
+const getAllLeadStatus = async (req, res) => {
+  try {
+    
+    const results = await queryAsync("SELECT * FROM lead_statuses");
+
+  
+    if (results.length === 0) {
+      return res.status(404).json({
+        status: "error",
+        message: "No lead sources found",
+      });
+    }
+
+   
+    res.status(200).json({
+      status: "success",
+      results: results,
+    });
+  } catch (error) {
+    console.error("Error fetching lead sources:", error);
+    res.status(500).json({
+      status: "error",
+      message: "Failed to fetch lead sources",
+    });
+  }
+};
 
 module.exports = {
   insertLead,
@@ -538,5 +586,8 @@ module.exports = {
   assignLeadToEmployee,
   updateLeadByEmployee,
   getLeadUpdatesByLeadId,
-  getBookedLeads
+  getBookedLeads,
+  getAllLeadSource,
+  getAllLeadStatus
+
 };
