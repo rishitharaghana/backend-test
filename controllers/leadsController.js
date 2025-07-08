@@ -473,6 +473,63 @@ const getLeadUpdatesByLeadId = async (req, res) => {
   }
 };
 
+const getBookedLeads = async (req, res) => {
+  const { lead_id, lead_added_user_type, lead_added_user_id, assigned_user_type, assigned_id, } = req.query;
+
+  if (!lead_added_user_type || !lead_added_user_id) {
+    return res.status(400).json({
+      status: "error",
+      message: "lead_added_user_type and lead_added_user_id are required",
+    });
+  }
+  let parsedLeadId;
+  if (lead_id) {
+    parsedLeadId = parseInt(lead_id, 10);
+    if (isNaN(parsedLeadId)) {
+      return res.status(400).json({
+        status: "error",
+        message: "lead_id must be a valid integer",
+      });
+    }
+  }
+  try {
+    let query = `
+      SELECT l.*
+      FROM leads l 
+      WHERE l.lead_added_user_type = ? AND l.lead_added_user_id = ? AND l.booked = 'Yes'
+    `;
+    const queryParams = [lead_added_user_type, lead_added_user_id];
+    if (parsedLeadId) {
+      query += ` AND l.lead_id = ?`;
+      queryParams.push(parsedLeadId);
+    }  
+    if (assigned_user_type && assigned_id) {
+      query += ` AND l.assigned_user_type = ? AND l.assigned_id = ?`;
+      queryParams.push(assigned_user_type, assigned_id);
+    }
+
+    query += ` ORDER BY l.created_date DESC, l.created_time DESC`;
+
+    const results = await queryAsync(query, queryParams);
+
+    if (results.length === 0) {
+      return res.status(404).json({ status: "error", message: "No booked leads found for the given criteria" });
+    }
+
+    const formattedResults = results.map((lead) => ({
+      ...lead,
+      created_date: moment(lead.created_date).format("YYYY-MM-DD"),
+      updated_date: moment(lead.updated_date).format("YYYY-MM-DD"),
+      assigned_date: lead.assigned_date ? moment(lead.assigned_date).format("YYYY-MM-DD") : null,
+    }));
+
+    res.status(200).json({ status: "success", results: formattedResults });
+  } catch (error) {
+    console.error("Error fetching booked leads:", { error, queryParams: req.query });
+    res.status(500).json({ status: "error", message: "Internal Server Error" });
+  }
+};
+
 module.exports = { getLeadUpdatesByLeadId };
 
 module.exports = {
@@ -481,4 +538,5 @@ module.exports = {
   assignLeadToEmployee,
   updateLeadByEmployee,
   getLeadUpdatesByLeadId,
+  getBookedLeads
 };
