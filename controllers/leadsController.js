@@ -235,7 +235,8 @@ const getLeadsByUser = async (req, res) => {
 };
 
 const assignLeadToEmployee = async (req, res) => {
-  const { lead_id, assigned_user_type, assigned_id, assigned_name, assigned_emp_number, assigned_priority, followup_feedback, next_action,lead_added_user_type, lead_added_user_id } = req.body;
+  const { lead_id, assigned_user_type, assigned_id, assigned_name, assigned_emp_number, assigned_priority, followup_feedback,
+     next_action,lead_added_user_type, lead_added_user_id, status_id } = req.body;
 
   // Validate required fields
   if (!lead_id || !assigned_user_type || !assigned_id || !assigned_name || !assigned_emp_number || !assigned_priority || !followup_feedback || !next_action || !lead_added_user_type || !lead_added_user_id) {
@@ -248,27 +249,45 @@ const assignLeadToEmployee = async (req, res) => {
   const parsedLeadId = parseInt(lead_id, 10);
   const parsedLeadAddedUserType = parseInt(lead_added_user_type, 10);
   const parsedLeadAddedUserId = parseInt(lead_added_user_id, 10);
-  if (isNaN(parsedLeadId) || isNaN(parsedLeadAddedUserType) || isNaN(parsedLeadAddedUserId)) {
+  const parsedStatusId = status_id ? parseInt(status_id,10) : null;
+  if (isNaN(parsedLeadId) || isNaN(parsedLeadAddedUserType) || 
+      isNaN(parsedLeadAddedUserId) || (status_id && isNaN(parsedStatusId))) {
     return res.status(400).json({
       status: "error",
-      message: "lead_id, lead_added_user_type, and lead_added_user_id must be valid integers",
+      message: "lead_id, lead_added_user_type, and lead_added_user_id must be valid integers; status_id must be a valid integer if provided",
     });
   }
-
+ if (status_id) {
+    const statusCheck = await queryAsync("SELECT status_id FROM lead_statuses WHERE status_id = ?", [parsedStatusId]);
+    if (statusCheck.length === 0) {
+      return res.status(400).json({ status: "error", message: "Invalid status_id" });
+    }
+  }
   const assigned_date = moment().format("YYYY-MM-DD");
   const assigned_time = moment().format("HH:mm:ss");
   const updated_date = moment().format("YYYY-MM-DD");
   const updated_time = moment().format("HH:mm:ss");
 
-  try {
+ try {
     await queryAsync("START TRANSACTION");
 
-    // Update the leads table
+   
+    let finalStatusId = parsedStatusId;
+    if (!status_id) {
+      const defaultStatus = await queryAsync("SELECT status_id FROM lead_statuses WHERE status_name = 'open'");
+      if (defaultStatus.length === 0) {
+        await queryAsync("ROLLBACK");
+        return res.status(400).json({ status: "error", message: "Default 'open' status not found" });
+      }
+      finalStatusId = defaultStatus[0].status_id;
+    }
+
+
     const updateQuery = `
       UPDATE leads 
       SET assigned_user_type = ?, assigned_id = ?, assigned_name = ?, assigned_emp_number = ?, 
           assigned_date = ?, assigned_time = ?, updated_date = ?, updated_time = ?, 
-          assigned_priority = ?, follow_up_feedback = ?, next_action = ?
+          assigned_priority = ?, follow_up_feedback = ?, next_action = ?, status_id = ?
       WHERE lead_id = ?
     `;
     const updateResult = await queryAsync(updateQuery, [
@@ -283,6 +302,7 @@ const assignLeadToEmployee = async (req, res) => {
       assigned_priority,
       followup_feedback,
       next_action,
+      finalStatusId,
       parsedLeadId,
     ]);
 
@@ -291,13 +311,12 @@ const assignLeadToEmployee = async (req, res) => {
       return res.status(404).json({ status: "error", message: "Lead not found" });
     }
 
-   
     const insertUpdateQuery = `
       INSERT INTO lead_updates (
         lead_id, update_date, update_time, feedback, next_action, 
         updated_by_emp_type, updated_by_emp_id, updated_by_emp_name, updated_emp_phone,
-        lead_added_user_type, lead_added_user_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        lead_added_user_type, lead_added_user_id, status_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     await queryAsync(insertUpdateQuery, [
       parsedLeadId,
@@ -311,11 +330,11 @@ const assignLeadToEmployee = async (req, res) => {
       assigned_emp_number,
       parsedLeadAddedUserType,
       parsedLeadAddedUserId,
+      finalStatusId,
     ]);
 
     await queryAsync("COMMIT");
 
-    
     const leadQuery = `
       SELECT * FROM leads WHERE lead_id = ?
     `;
