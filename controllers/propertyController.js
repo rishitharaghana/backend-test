@@ -94,7 +94,7 @@ const insertProperty = async (req, res) => {
             return res.status(400).json({ error: 'rera_number must be null when rera_registered is No' });
         }
 
-        // Validate payment_mode
+     
         let paymentModeArray;
         try {
             paymentModeArray = JSON.parse(payment_mode);
@@ -109,7 +109,7 @@ const insertProperty = async (req, res) => {
             return res.status(400).json({ error: 'Invalid payment_mode values' });
         }
 
-        // Validate launch_type and launched_date
+       
         if (!['Pre Launch', 'Soft Launch', 'Launched'].includes(launch_type)) {
             return res.status(400).json({ error: 'Invalid launch_type value' });
         }
@@ -123,12 +123,12 @@ const insertProperty = async (req, res) => {
             return res.status(400).json({ error: 'launched_date must be null when launch_type is not Launched' });
         }
 
-        // Validate user_id and posted_by
+        
         if (isNaN(parseInt(user_id)) || isNaN(parseInt(posted_by))) {
             return res.status(400).json({ error: 'user_id and posted_by must be valid integers' });
         }
 
-        // Handle file uploads (optional)
+       
         const baseDir = path.join(__dirname, '..');
         const brochure = req.files['brochure'] ? path.relative(baseDir, req.files['brochure'][0].path) : null;
         const price_sheet = req.files['price_sheet'] ? path.relative(baseDir, req.files['price_sheet'][0].path) : null;
@@ -138,7 +138,7 @@ const insertProperty = async (req, res) => {
             await queryAsync('START TRANSACTION');
             const currentTimestamp = moment().format('YYYY-MM-DD HH:mm:ss');
 
-            // Format dates
+            
             const formattedPossessionDate = possessionEndDate
                 ? moment(possessionEndDate, 'YYYY-MM-DD').format('YYYY-MM-DD')
                 : null;
@@ -146,7 +146,7 @@ const insertProperty = async (req, res) => {
                 ? moment(launched_date, 'YYYY-MM-DD').format('YYYY-MM-DD')
                 : null;
 
-            // Insert into property table
+           
             const propertyResult = await queryAsync(
                 `INSERT INTO property (
                     project_name, property_type, property_subtype, builder_name, 
@@ -179,7 +179,7 @@ const insertProperty = async (req, res) => {
             );
             const property_id = propertyResult.insertId;
 
-            // Insert sizes
+           
             let sizesArray;
             try {
                 sizesArray = JSON.parse(sizes);
