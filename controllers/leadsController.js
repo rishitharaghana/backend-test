@@ -159,6 +159,70 @@ const insertLead = async (req, res) => {
   }
 };
 
+const updateBookingDone = async (req, res) => {
+  const { lead_id, lead_added_user_type, lead_added_user_id } = req.body;
+
+  // Validate required fields
+  if (!lead_id || lead_added_user_type === undefined || lead_added_user_id === undefined) {
+    return res.status(400).json({
+      status: "error",
+      message: "lead_id, lead_added_user_type, and lead_added_user_id are required",
+    });
+  }
+
+  const parsedLeadId = parseInt(lead_id, 10);
+  const parsedLeadAddedUserType = parseInt(lead_added_user_type, 10);
+  const parsedLeadAddedUserId = parseInt(lead_added_user_id, 10);
+
+  if (isNaN(parsedLeadId) || isNaN(parsedLeadAddedUserType) || isNaN(parsedLeadAddedUserId)) {
+    return res.status(400).json({
+      status: "error",
+      message: "lead_id, lead_added_user_type, and lead_added_user_id must be valid integers",
+    });
+  }
+
+  const updated_date = moment().format("YYYY-MM-DD");
+  const updated_time = moment().format("HH:mm:ss");
+
+  try {
+    await queryAsync("START TRANSACTION");
+
+    // Update the booked field in the leads table
+    const updateQuery = `
+      UPDATE leads 
+      SET booked = 'Yes', updated_date = ?, updated_time = ?
+      WHERE lead_id = ? AND lead_added_user_type = ? AND lead_added_user_id = ?
+    `;
+    const updateResult = await queryAsync(updateQuery, [
+      updated_date,
+      updated_time,
+      parsedLeadId,
+      parsedLeadAddedUserType,
+      parsedLeadAddedUserId,
+    ]);
+
+    if (updateResult.affectedRows === 0) {
+      await queryAsync("ROLLBACK");
+      return res.status(404).json({ status: "error", message: "Lead not found or you are not authorized to update this lead" });
+    }
+
+    await queryAsync("COMMIT");
+
+    return res.status(200).json({
+      status: "success",
+      message: "Lead marked as booked successfully",
+      lead_id: parsedLeadId,
+    });
+  } catch (error) {
+    await queryAsync("ROLLBACK");
+    console.error("Error updating booking status:", error);
+    return res.status(500).json({
+      status: "error",
+      message: "Failed to update booking status",
+    });
+  }
+};
+
 const getLeadsByUser = async (req, res) => {
   const { lead_added_user_type, lead_added_user_id, assigned_user_type, assigned_id,status_id} = req.query;
 
@@ -607,6 +671,7 @@ module.exports = {
   getLeadUpdatesByLeadId,
   getBookedLeads,
   getAllLeadSource,
-  getAllLeadStatus
+  getAllLeadStatus,
+  updateBookingDone
 
 };
