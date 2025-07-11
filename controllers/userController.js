@@ -322,7 +322,7 @@ const getUserTypesCount = async (req, res) => {
       );
 
       result = [
-        { user_type: "new_leads", count: leadsResult[0].new_leads_count || 0 },
+       
         { user_type: "today_leads", count: leadsResult[0].today_leads_count || 0 },
         { user_type: "today_follow_ups", count: leadsResult[0].today_follow_ups_count || 0 },
         { user_type: "site_visit_done", count: leadsResult[0].site_visit_done_count || 0 },
@@ -379,7 +379,7 @@ const getUserTypesCount = async (req, res) => {
 
       result = [
        
-        { user_type: "new_leads", count: leadsResult[0].new_leads_count || 0 },
+        { user_type: "today_leads", count: leadsResult[0].new_leads_count || 0 },
         { user_type: "today_follow_ups", count: leadsResult[0].today_follow_ups_count || 0 },
         { user_type: "site_visit_done", count: leadsResult[0].site_visit_done_count || 0 },
        
