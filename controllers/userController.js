@@ -395,6 +395,101 @@ const getUserTypesCount = async (req, res) => {
   }
 };
 
+const getUserProfile = async (req, res) => {
+  const { admin_user_type, admin_user_id, emp_id, emp_user_type } = req.query;
+
+  try {
+   
+    if (!admin_user_type || isNaN(parseInt(admin_user_type))) {
+      return res.status(400).json({ error: "admin_user_type is required and must be a valid integer" });
+    }
+    if (!admin_user_id || isNaN(parseInt(admin_user_id))) {
+      return res.status(400).json({ error: "admin_user_id is required and must be a valid integer" });
+    }
+
+    const parsedAdminUserType = parseInt(admin_user_type);
+    const parsedAdminUserId = parseInt(admin_user_id);
+
+    let query = `
+      SELECT id, user_type, name, mobile, email, photo, status, created_date, created_time, 
+             updated_date, updated_time, state, city, location, address, pincode, gst_number, 
+             rera_number, created_by, created_user_id, created_user_type, company_name, 
+             company_number, company_address, representative_name, pan_card_number, 
+             aadhar_number, feedback 
+      FROM crm_users 
+    `;
+    let params = [];
+
+  
+    if (!emp_id && !emp_user_type) {
+      query += ` WHERE id = ? AND user_type = ?`;
+      params = [parsedAdminUserId, parsedAdminUserType];
+    } 
+   
+    else {
+      if (!emp_id || isNaN(parseInt(emp_id))) {
+        return res.status(400).json({ error: "emp_id is required and must be a valid integer" });
+      }
+      if (!emp_user_type || isNaN(parseInt(emp_user_type))) {
+        return res.status(400).json({ error: "emp_user_type is required and must be a valid integer" });
+      }
+
+      const parsedEmpId = parseInt(emp_id);
+      const parsedEmpUserType = parseInt(emp_user_type);
+
+    
+      query += ` WHERE created_user_id = ? AND created_user_type = ? AND id = ? AND user_type = ?`;
+      params = [parsedAdminUserId, parsedAdminUserType, parsedEmpId, parsedEmpUserType];
+    }
+
+    const usersResult = await queryAsync(query, params);
+
+    if (usersResult.length === 0) {
+      return res.status(404).json({
+        error: !emp_id && !emp_user_type ? "Builder not found" : "No employees found for the given admin and employee details",
+      });
+    }
+
+    const users = usersResult.map((user) => ({
+      id: user.id,
+      user_type: user.user_type,
+      name: user.name,
+      mobile: user.mobile,
+      email: user.email,
+      photo: user.photo,
+      status: user.status,
+      created_date: user.created_date,
+      created_time: user.created_time,
+      updated_date: user.updated_date,
+      updated_time: user.updated_time,
+      state: user.state,
+      city: user.city,
+      location: user.location,
+      address: user.address,
+      pincode: user.pincode,
+      gst_number: user.gst_number,
+      rera_number: user.rera_number,
+      created_by: user.created_by,
+      created_user_id: user.created_user_id,
+      created_user_type: user.created_user_type,
+      company_name: user.company_name,
+      company_number: user.company_number,
+      company_address: user.company_address,
+      representative_name: user.representative_name,
+      pan_card_number: user.pan_card_number,
+      aadhar_number: user.aadhar_number,
+      feedback: user.feedback,
+    }));
+
+    res.status(200).json({
+      message: "User profile fetched successfully",
+      data: users,
+    });
+  } catch (error) {
+    console.error("Error fetching user profile:", { error, queryParams: req.query });
+    res.status(500).json({ error: "Failed to fetch data: " + error.message });
+  }
+};
 
 
-module.exports = {insertCrmUser,updateUserStatus,getUserTypesByBuilder,getUserTypesCount}
+module.exports = {insertCrmUser,updateUserStatus,getUserTypesByBuilder,getUserTypesCount,getUserProfile}
