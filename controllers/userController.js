@@ -363,7 +363,7 @@ const getUserTypesCount = async (req, res) => {
      
       const leadsResult = await queryAsync(
         `SELECT 
-            COUNT(*) as all_projects_count, -- Note: This might be a misnomer; consider renaming if not intended for projects
+
             SUM(CASE WHEN status_id = 1 AND booked = 'No' THEN 1 ELSE 0 END) as new_leads_count,
             SUM(CASE WHEN created_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_leads_count,
             SUM(CASE WHEN next_action IS NOT NULL AND updated_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_follow_ups_count,
@@ -378,12 +378,11 @@ const getUserTypesCount = async (req, res) => {
         );
 
       result = [
-        { user_type: "all_projects", count: projectsResult[0].project_count || 0 },
+       
         { user_type: "new_leads", count: leadsResult[0].new_leads_count || 0 },
-        { user_type: "today_leads", count: leadsResult[0].today_leads_count || 0 },
         { user_type: "today_follow_ups", count: leadsResult[0].today_follow_ups_count || 0 },
         { user_type: "site_visit_done", count: leadsResult[0].site_visit_done_count || 0 },
-        { user_type: "booked", count: leadsResult[0].booked_count || 0 },
+       
       ];
     } else if (parsedAdminUserType !== 2) {
       return res.status(400).json({ error: "Invalid admin_user_type or missing emp_id and emp_user_type for non-builder" });
