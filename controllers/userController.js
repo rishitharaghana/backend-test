@@ -32,6 +32,7 @@ const insertCrmUser = async (req,res) => {
             rera_number,
             created_by,
             created_user_id,
+            created_user_type,
             company_name,
             company_number,
             company_address,
@@ -52,7 +53,8 @@ const insertCrmUser = async (req,res) => {
             !location ||
             !pincode ||
             !created_by ||
-            !created_user_id
+            !created_user_id ||
+            !created_user_type
         ) {
             return res.status(400).json({ error: 'Missing required user fields' });
         }
@@ -103,7 +105,7 @@ const insertCrmUser = async (req,res) => {
                     user_type, name, mobile, email, password, photo, status,
                     created_date, created_time, updated_date, updated_time,
                     state, city, location, address, pincode, gst_number, rera_number,
-                    created_by, created_user_id, company_name, company_number,
+                    created_by, created_user_id,created_user_type,company_name, company_number,
                     company_address, representative_name, pan_card_number, aadhar_number, feedback
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
@@ -127,6 +129,7 @@ const insertCrmUser = async (req,res) => {
                     rera_number || null,
                     created_by,
                     parseInt(created_user_id),
+                    parseInt(created_user_type),
                     company_name || null,
                     company_number || null,
                     company_address || null,
@@ -151,6 +154,234 @@ const insertCrmUser = async (req,res) => {
 
     })
 }
+
+const editCrmUser = async (req, res) => {
+    upload.fields([{ name: 'photo', maxCount: 1 }])(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ error: 'File Upload error: ' + err.message });
+        }
+
+        const { id } = req.params;
+        const {
+            name, mobile, password, state, city, location, address, pincode, rera_number, email, status, feedback,
+           created_user_id, created_user_type
+        } = req.body;
+
+        if (!id || isNaN(parseInt(id))) {
+            return res.status(400).json({ error: 'Invalid user ID' });
+        }
+
+        if (isNaN(parseInt(created_user_id)) || isNaN(parseInt(created_user_type))) {
+            return res.status(400).json({ error: 'Missing or invalid  created_user_id, or created_user_type' });
+        }
+
+        try {
+            // Check if user to edit exists
+            const userResult = await queryAsync('SELECT user_type, created_user_id FROM crm_users WHERE id = ?', [parseInt(id)]);
+            if (!userResult.length) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            const userToEdit = userResult[0];
+            const userTypeToEdit = userToEdit.user_type;
+
+            // Check if created_user_id exists and get their user_type
+            const updaterResult = await queryAsync('SELECT user_type FROM crm_users WHERE id = ?', [parseInt(created_user_id)]);
+            if (!updaterResult.length) {
+                return res.status(400).json({ error: 'Invalid created_user_id: User does not exist' });
+            }
+
+            const updaterUserType = updaterResult[0].user_type;
+
+            // Permission checks
+            if (updaterUserType === 1) {
+                // Admin can only edit Builder (user_type 2)
+                if (userTypeToEdit !== 2) {
+                    return res.status(403).json({ error: 'Admin can only edit Builder (user_type 2)' });
+                }
+            } else if (updaterUserType === 2) {
+                // Builder can only edit their own employees (user_type 3, 4, 5, 6, 7)
+                if (![3, 4, 5, 6, 7].includes(userTypeToEdit)) {
+                    return res.status(403).json({ error: 'Builder can only edit Channel Partner, Sales Manager, Telecallers, Marketing Agent, or Receptionists' });
+                }
+                // Ensure the user being edited was created by this builder
+                if (userToEdit.created_user_id !== parseInt(created_user_id)) {
+                    return res.status(403).json({ error: 'Builder can only edit their own employees' });
+                }
+            } else {
+                return res.status(403).json({ error: 'Only Admin (1) or Builder (2) can edit users' });
+            }
+
+            // Field restrictions
+            let allowedFields = {};
+            if (userTypeToEdit === 2) {
+                // Builder: only specific fields allowed
+                allowedFields = { name, mobile, password, state, city, location, address, pincode, rera_number, email,aadhar_number,gst_number,pan_card_number };
+                if (req.body.company_name || req.body.company_number ||
+                    req.body.company_address || req.body.representative_name 
+                   ) {
+                    return res.status(400).json({ error: 'Invalid fields provided for Builder' });
+                }
+            } else if (userTypeToEdit === 3) {
+                
+                allowedFields = {
+                    name, mobile, password, state, city, location, address, pincode, rera_number, email,
+                    gst_number: req.body.gst_number, company_name: req.body.company_name,
+                    company_number: req.body.company_number, company_address: req.body.company_address,
+                    representative_name: req.body.representative_name, pan_card_number: req.body.pan_card_number,
+                    aadhar_number: req.body.aadhar_number
+                };
+            } else if ([4, 5, 6, 7].includes(userTypeToEdit)) {
+                
+                allowedFields = { name, mobile, password, state, city, location, address, pincode, email };
+                if (status !== undefined) {
+                    allowedFields.status = parseInt(status);
+                }
+                if (req.body.gst_number || req.body.rera_number || req.body.company_name ||
+                    req.body.company_number || req.body.company_address ||
+                    req.body.representative_name || req.body.pan_card_number || req.body.aadhar_number) {
+                    return res.status(400).json({ error: 'Restricted fields provided for this user type' });
+                }
+            }
+
+           
+            if (!name || !mobile || !state || !city || !location || !pincode || !email) {
+                return res.status(400).json({ error: 'Missing required user fields' });
+            }
+
+            
+            if (status !== undefined) {
+                if (![0, 1, 2].includes(parseInt(status))) {
+                    return res.status(400).json({ error: 'Invalid status. Must be 0, 1, or 2' });
+                }
+                if (parseInt(status) === 2 && !feedback) {
+                    return res.status(400).json({ error: 'Feedback is required when status is Rejected (2)' });
+                }
+                if ([0, 1].includes(parseInt(status)) && feedback) {
+                    return res.status(400).json({ error: 'Feedback must be null when status is Pending (0) or Approved (1)' });
+                }
+            }
+
+            
+            const baseDir = path.join(__dirname, '..');
+            const photo = req.files['photo'] ? path.relative(baseDir, req.files['photo'][0].path) : null;
+
+            let hashedPassword = null;
+            if (password) {
+                hashedPassword = await bcrypt.hash(password, 10);
+            }
+
+          
+            const updateFields = {
+                name, mobile, email,
+                password: hashedPassword || undefined,
+                photo: photo || undefined,
+                state, city, location, address: address || null, pincode,
+                rera_number: rera_number || null,
+                gst_number: req.body.gst_number || null,
+                company_name: req.body.company_name || null,
+                company_number: req.body.company_number || null,
+                company_address: req.body.company_address || null,
+                representative_name: req.body.representative_name || null,
+                pan_card_number: req.body.pan_card_number || null,
+                aadhar_number: req.body.aadhar_number || null,
+                updated_date: moment().format('YYYY-MM-DD'),
+                updated_time: moment().format('HH:mm:ss'),
+                created_user_id: parseInt(created_user_id), created_user_type: parseInt(created_user_type)
+            };
+
+            if (status !== undefined) {
+                updateFields.status = parseInt(status);
+                updateFields.feedback = feedback || null;
+            }
+
+            
+            const definedFields = Object.fromEntries(
+                Object.entries(updateFields).filter(([_, v]) => v !== undefined)
+            );
+
+           
+            const setClause = Object.keys(definedFields).map(key => `${key} = ?`).join(', ');
+            const values = Object.values(definedFields);
+
+            await queryAsync('START TRANSACTION');
+            await queryAsync(
+                `UPDATE crm_users SET ${setClause} WHERE id = ?`,
+                [...values, parseInt(id)]
+            );
+            await queryAsync('COMMIT');
+
+            res.status(200).json({ message: 'User updated successfully' });
+
+        } catch (error) {
+            await queryAsync('ROLLBACK');
+            res.status(500).json({ error: 'Failed to update user: ' + error.message });
+        }
+    });
+};
+
+const deleteCrmUser = async (req, res) => {
+    const { id } = req.params;
+    const { created_user_id, created_user_type } = req.body;
+
+    if (!id || isNaN(parseInt(id))) {
+        return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    if (isNaN(parseInt(created_user_id)) || isNaN(parseInt(created_user_type))) {
+        return res.status(400).json({ error: 'Missing or invalid  created_user_id, or created_user_type' });
+    }
+
+    try {
+        // Check if user to delete exists
+        const userResult = await queryAsync('SELECT user_type, created_user_id FROM crm_users WHERE id = ?', [parseInt(id)]);
+        if (!userResult.length) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const userToDelete = userResult[0];
+        const userTypeToDelete = userToDelete.user_type;
+
+        // Check if created_user_id exists and get their user_type
+        const deleterResult = await queryAsync('SELECT user_type FROM crm_users WHERE id = ?', [parseInt(created_user_id)]);
+        if (!deleterResult.length) {
+            return res.status(400).json({ error: 'Invalid created_user_id: User does not exist' });
+        }
+
+        const deleterUserType = deleterResult[0].user_type;
+
+        // Permission checks
+        if (deleterUserType === 1) {
+            // Admin can only delete Builder (user_type 2)
+            if (userTypeToDelete !== 2) {
+                return res.status(403).json({ error: 'Admin can only delete Builder (user_type 2)' });
+            }
+        } else if (deleterUserType === 2) {
+            // Builder can only delete their own employees (user_type 3, 4, 5, 6, 7)
+            if (![3, 4, 5, 6, 7].includes(userTypeToDelete)) {
+                return res.status(403).json({ error: 'Builder can only delete Channel Partner, Sales Manager, Telecallers, Marketing Agent, or Receptionists' });
+            }
+            // Ensure the user being deleted was created by this builder
+            if (userToDelete.created_user_id !== parseInt(created_user_id)) {
+                return res.status(403).json({ error: 'Builder can only delete their own employees' });
+            }
+        } else {
+            return res.status(403).json({ error: 'Only Admin (1) or Builder (2) can delete users' });
+        }
+
+        await queryAsync('START TRANSACTION');
+        await queryAsync('DELETE FROM crm_users WHERE id = ?', [parseInt(id)]);
+        await queryAsync('COMMIT');
+
+        res.status(200).json({ message: 'User deleted successfully' });
+
+    } catch (error) {
+        await queryAsync('ROLLBACK');
+        res.status(500).json({ error: 'Failed to delete user: ' + error.message });
+    }
+};
+
+
 
 const updateUserStatus = async (req,res)=>{
     const {user_id,status,feedback,updated_by_user_id} = req.body;
@@ -264,6 +495,7 @@ const getUserTypesByBuilder = async (req, res) => {
             photo: user.photo,
             status: user.status,
             created_user_id: user.created_user_id,
+            created_user_type:user.created_user_type,
             created_date: user.created_date,
             created_time: user.created_time,
             updated_date: user.updated_date,
@@ -491,4 +723,4 @@ const getUserProfile = async (req, res) => {
 };
 
 
-module.exports = {insertCrmUser,updateUserStatus,getUserTypesByBuilder,getUserTypesCount,getUserProfile}
+module.exports = {insertCrmUser,updateUserStatus,getUserTypesByBuilder,getUserTypesCount,getUserProfile,deleteCrmUser,editCrmUser,}
