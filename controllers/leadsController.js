@@ -160,24 +160,76 @@ const insertLead = async (req, res) => {
 };
 
 const updateBookingDone = async (req, res) => {
-  const { lead_id, lead_added_user_type, lead_added_user_id } = req.body;
+  const { lead_id, 
+    lead_added_user_type, 
+    lead_added_user_id,property_id,flat_number,floor_number,block_number,asset,sqft,budget
+  } = req.body;
 
-  // Validate required fields
-  if (!lead_id || lead_added_user_type === undefined || lead_added_user_id === undefined) {
+  
+  if (
+    !lead_id ||
+    lead_added_user_type === undefined ||
+    lead_added_user_id === undefined ||
+    !property_id ||
+    !flat_number ||
+    !floor_number ||
+    !block_number ||
+    !asset ||
+    !sqft ||
+    !budget
+  ) {
     return res.status(400).json({
-      status: "error",
-      message: "lead_id, lead_added_user_type, and lead_added_user_id are required",
+      status: 'error',
+      message:
+        'lead_id, lead_added_user_type, lead_added_user_id, property_id, flat_number, floor_number, block_number, asset, sqft, and budget are required',
     });
   }
 
   const parsedLeadId = parseInt(lead_id, 10);
   const parsedLeadAddedUserType = parseInt(lead_added_user_type, 10);
   const parsedLeadAddedUserId = parseInt(lead_added_user_id, 10);
+  const parsedPropertyId = parseInt(property_id, 10);
 
-  if (isNaN(parsedLeadId) || isNaN(parsedLeadAddedUserType) || isNaN(parsedLeadAddedUserId)) {
+   if (
+    isNaN(parsedLeadId) ||
+    isNaN(parsedLeadAddedUserType) ||
+    isNaN(parsedLeadAddedUserId) ||
+    isNaN(parsedPropertyId)
+  ) {
     return res.status(400).json({
-      status: "error",
-      message: "lead_id, lead_added_user_type, and lead_added_user_id must be valid integers",
+      status: 'error',
+      message:
+        'lead_id, lead_added_user_type, lead_added_user_id, and property_id must be valid integers',
+    });
+  }
+
+  if (
+    flat_number.length > 50 ||
+    floor_number.length > 50 ||
+    block_number.length > 50 ||
+    asset.length > 100 ||
+    sqft.length > 10 ||
+    budget.length > 20
+  ) {
+    return res.status(400).json({
+      status: 'error',
+      message:
+        'Field lengths exceeded: flat_number (50), floor_number (50), block_number (50), asset (100), sqft (10), budget (20)',
+    });
+  }
+
+ 
+  if (!/^\d+(\.\d{1,2})?$/.test(sqft)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'sqft must be a valid number with up to 2 decimal places',
+    });
+  }
+
+  if (!/^\d+(\.\d{1,2})?$/.test(budget)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'budget must be a valid number with up to 2 decimal places',
     });
   }
 
@@ -186,8 +238,6 @@ const updateBookingDone = async (req, res) => {
 
   try {
     await queryAsync("START TRANSACTION");
-
-    // Update the booked field in the leads table
     const updateQuery = `
       UPDATE leads 
       SET booked = 'Yes', updated_date = ?, updated_time = ?
@@ -206,12 +256,37 @@ const updateBookingDone = async (req, res) => {
       return res.status(404).json({ status: "error", message: "Lead not found or you are not authorized to update this lead" });
     }
 
+     const insertBookingQuery = `
+      INSERT INTO booked_properties (
+        property_id, lead_id, flat_number, floor_number, block_number, asset, sqft, budget
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const insertBookingResult = await queryAsync(insertBookingQuery, [
+      parsedPropertyId,
+      parsedLeadId,
+      flat_number,
+      floor_number,
+      block_number,
+      asset,
+      sqft,
+      budget,
+    ]);
+
+    if (insertBookingResult.affectedRows === 0) {
+      await queryAsync('ROLLBACK');
+      return res.status(500).json({
+        status: 'error',
+        message: 'Failed to insert booking details',
+      });
+    }
+
     await queryAsync("COMMIT");
 
     return res.status(200).json({
       status: "success",
       message: "Lead marked as booked successfully",
       lead_id: parsedLeadId,
+      booked_id:insertBookingResult.insertId
     });
   } catch (error) {
     await queryAsync("ROLLBACK");
@@ -557,38 +632,75 @@ const getLeadUpdatesByLeadId = async (req, res) => {
 };
 
 const getBookedLeads = async (req, res) => {
-  const { lead_id, lead_added_user_type, lead_added_user_id, assigned_user_type, assigned_id, } = req.query;
+  const { lead_id, lead_added_user_type, lead_added_user_id, assigned_user_type, assigned_id } = req.query;
 
+  // Validate required fields
   if (!lead_added_user_type || !lead_added_user_id) {
     return res.status(400).json({
-      status: "error",
-      message: "lead_added_user_type and lead_added_user_id are required",
+      status: 'error',
+      message: 'lead_added_user_type and lead_added_user_id are required',
     });
   }
+
+  // Validate lead_id if provided
   let parsedLeadId;
   if (lead_id) {
     parsedLeadId = parseInt(lead_id, 10);
     if (isNaN(parsedLeadId)) {
       return res.status(400).json({
-        status: "error",
-        message: "lead_id must be a valid integer",
+        status: 'error',
+        message: 'lead_id must be a valid integer',
       });
     }
   }
+
+  // Validate assigned_user_type and assigned_id if both are provided
+  if ((assigned_user_type && !assigned_id) || (!assigned_user_type && assigned_id)) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Both assigned_user_type and assigned_id must be provided together',
+    });
+  }
+
+  let parsedAssignedId;
+  if (assigned_id) {
+    parsedAssignedId = parseInt(assigned_id, 10);
+    if (isNaN(parsedAssignedId)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'assigned_id must be a valid integer',
+      });
+    }
+  }
+
   try {
     let query = `
-      SELECT l.*
-      FROM leads l 
+      SELECT 
+        l.*,
+        bp.property_id,
+        bp.flat_number,
+        bp.floor_number,
+        bp.block_number,
+        bp.asset,
+        bp.sqft,
+        bp.budget,
+        p.project_name,
+        p.property_subtype
+      FROM leads l
+      LEFT JOIN booked_properties bp ON l.lead_id = bp.lead_id
+      LEFT JOIN property p ON bp.property_id = p.property_id
       WHERE l.lead_added_user_type = ? AND l.lead_added_user_id = ? AND l.booked = 'Yes'
     `;
     const queryParams = [lead_added_user_type, lead_added_user_id];
+
     if (parsedLeadId) {
       query += ` AND l.lead_id = ?`;
       queryParams.push(parsedLeadId);
-    }  
-    if (assigned_user_type && assigned_id) {
+    }
+
+    if (assigned_user_type && parsedAssignedId) {
       query += ` AND l.assigned_user_type = ? AND l.assigned_id = ?`;
-      queryParams.push(assigned_user_type, assigned_id);
+      queryParams.push(assigned_user_type, parsedAssignedId);
     }
 
     query += ` ORDER BY l.created_date DESC, l.created_time DESC`;
@@ -596,20 +708,36 @@ const getBookedLeads = async (req, res) => {
     const results = await queryAsync(query, queryParams);
 
     if (results.length === 0) {
-      return res.status(404).json({ status: "error", message: "No booked leads found for the given criteria" });
+      return res.status(404).json({
+        status: 'error',
+        message: 'No booked leads found for the given criteria',
+      });
     }
 
     const formattedResults = results.map((lead) => ({
       ...lead,
-      created_date: moment(lead.created_date).format("YYYY-MM-DD"),
-      updated_date: moment(lead.updated_date).format("YYYY-MM-DD"),
-      assigned_date: lead.assigned_date ? moment(lead.assigned_date).format("YYYY-MM-DD") : null,
+      created_date: lead.created_date ? moment(lead.created_date).format('YYYY-MM-DD') : null,
+      updated_date: lead.updated_date ? moment(lead.updated_date).format('YYYY-MM-DD') : null,
+      assigned_date: lead.assigned_date ? moment(lead.assigned_date).format('YYYY-MM-DD') : null,
+      property: lead.property_id
+        ? {
+            property_id: lead.property_id,
+            project_name: lead.project_name,
+            property_subtype: lead.property_subtype,
+            flat_number: lead.flat_number,
+            floor_number: lead.floor_number,
+            block_number: lead.block_number,
+            asset: lead.asset,
+            sqft: lead.sqft,
+            budget: lead.budget,
+          }
+        : null,
     }));
 
-    res.status(200).json({ status: "success", results: formattedResults });
+    res.status(200).json({ status: 'success', results: formattedResults });
   } catch (error) {
-    console.error("Error fetching booked leads:", { error, queryParams: req.query });
-    res.status(500).json({ status: "error", message: "Internal Server Error" });
+    console.error('Error fetching booked leads:', { error, queryParams: req.query });
+    res.status(500).json({ status: 'error', message: 'Internal Server Error' });
   }
 };
 
