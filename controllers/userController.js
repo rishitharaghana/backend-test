@@ -11,11 +11,12 @@ const uploadDir = '../uploads/';
 const upload = createMulterInstance(uploadDir, allowedTypes);
 const queryAsync = util.promisify(pool.query).bind(pool);
 
-const insertCrmUser = async (req,res) => {
-    upload.fields([{name:'photo',maxCount:1}])(req,res,async (err)=>{
-        if (err){
-            return res.status(400).json({error:'File Upload error'+err.message});
+const insertCrmUser = async (req, res) => {
+    upload.fields([{ name: "photo", maxCount: 1 }])(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ error: "File upload error: " + err.message });
         }
+
         const {
             user_type,
             name,
@@ -39,8 +40,10 @@ const insertCrmUser = async (req,res) => {
             representative_name,
             pan_card_number,
             aadhar_number,
-            feedback
+            feedback,
         } = req.body;
+
+        // Enhanced validation
         if (
             !user_type ||
             !name ||
@@ -54,106 +57,131 @@ const insertCrmUser = async (req,res) => {
             !pincode ||
             !created_by ||
             !created_user_id ||
-            !created_user_type
+            !created_user_type ||
+            typeof user_type === "undefined" ||
+            typeof name === "undefined" ||
+            typeof mobile === "undefined" ||
+            typeof email === "undefined" ||
+            typeof password === "undefined" ||
+            typeof status === "undefined" ||
+            typeof state === "undefined" ||
+            typeof city === "undefined" ||
+            typeof location === "undefined" ||
+            typeof pincode === "undefined" ||
+            typeof created_by === "undefined" ||
+            typeof created_user_id === "undefined" ||
+            typeof created_user_type === "undefined"
         ) {
-            return res.status(400).json({ error: 'Missing required user fields' });
+            console.log("Missing fields:", req.body);
+            return res.status(400).json({ error: "Missing or undefined required user fields" });
         }
-        const validUserTypes = [1,2,3,4,5,6,7];
-        if (!validUserTypes.includes(parseInt(user_type))){
-            return res.status(400).json({ error: 'Invalid user_type. Must be 1, 2, 3, 4, 5, 6, or 7' });
+
+        const validUserTypes = [1, 2, 3, 4, 5, 6, 7];
+        if (!validUserTypes.includes(parseInt(user_type))) {
+            return res.status(400).json({ error: "Invalid user_type. Must be 1, 2, 3, 4, 5, 6, or 7" });
         }
-        if (![0,1,2].includes(parseInt(status))){
-            return res.status(400).json({ error: 'Invalid status. Must be 0, 1, or 2' });
+
+        if (![0, 1, 2].includes(parseInt(status))) {
+            return res.status(400).json({ error: "Invalid status. Must be 0, 1, or 2" });
         }
-        if (status == 2 && !feedback) {
-            return res.status(400).json({ error: 'Feedback is required when status is Rejected (2)' });
+
+        if (parseInt(status) === 2 && !feedback) {
+            return res.status(400).json({ error: "Feedback is required when status is Rejected (2)" });
         }
+
         if ([0, 1].includes(parseInt(status)) && feedback) {
-            return res.status(400).json({ error: 'Feedback must be null when status is Pending (0) or Approved (1)' });
+            return res.status(400).json({ error: "Feedback must be null when status is Pending (0) or Approved (1)" });
         }
+
         if (isNaN(parseInt(created_user_id))) {
-            return res.status(400).json({ error: 'created_user_id must be a valid integer' });
+            return res.status(400).json({ error: "created_user_id must be a valid integer" });
         }
+
         try {
-             const creatorResult = await queryAsync('SELECT user_type FROM crm_users WHERE id = ?', [parseInt(created_user_id)]);
-             if (!creatorResult.length) {
-                return res.status(400).json({ error: 'Invalid created_user_id: User does not exist' });
-            }
-            const creatorUserType = creatorResult[0].user_type;
-            if (creatorUserType === 1) {
-                if (!validUserTypes.includes(parseInt(user_type))) {
-                    return res.status(400).json({ error: 'Invalid user_type for Admin' });
-                }
-            }
-            else if (creatorUserType === 2){
-                if (![3, 4, 5, 6, 7].includes(parseInt(user_type))) {
-                    return res.status(400).json({ error: 'Builder can only create user types 3, 4, 5, 6, or 7' });
-                }
-            }
-            else {
-                return res.status(403).json({ error: 'Only Admin (1) or Builder (2) can create users' });
+            // Check if creator exists
+            const creatorResult = await queryAsync("SELECT user_type FROM crm_users WHERE id = ?", [parseInt(created_user_id)]);
+            if (!creatorResult.length) {
+                return res.status(400).json({ error: "Invalid created_user_id: User does not exist" });
             }
 
-            const baseDir = path.join(__dirname, '..');
-            const photo = req.files['photo'] ? path.relative(baseDir, req.files['photo'][0].path) : null;
+            const creatorUserType = creatorResult[0].user_type;
+
+            // Permission checks
+            if (creatorUserType === 1) {
+                if (!validUserTypes.includes(parseInt(user_type))) {
+                    return res.status(400).json({ error: "Invalid user_type for Admin" });
+                }
+            } else if (creatorUserType === 2) {
+                if (![3, 4, 5, 6, 7].includes(parseInt(user_type))) {
+                    return res.status(400).json({ error: "Builder can only create user types 3, 4, 5, 6, or 7" });
+                }
+            } else {
+                return res.status(403).json({ error: "Only Admin (1) or Builder (2) can create users" });
+            }
+
+            const baseDir = path.join(__dirname, "..");
+            const photo = req.files && req.files["photo"] ? path.relative(baseDir, req.files["photo"][0].path) : null;
+
             const hashedPassword = await bcrypt.hash(password, 10);
-            await queryAsync('START TRANSACTION');
-            const currentDate = moment().format('YYYY-MM-DD');
-            const currentTime = moment().format('HH:mm:ss');
+            const currentDate = moment().format("YYYY-MM-DD");
+            const currentTime = moment().format("HH:mm:ss");
+
+            const values = [
+                parseInt(user_type),
+                name,
+                mobile,
+                email,
+                hashedPassword,
+                photo,
+                parseInt(status),
+                currentDate,
+                currentTime,
+                currentDate,
+                currentTime,
+                state,
+                city,
+                location,
+                address || null,
+                pincode,
+                gst_number || null,
+                rera_number || null,
+                created_by,
+                parseInt(created_user_id),
+                parseInt(created_user_type),
+                company_name || null,
+                company_number || null,
+                company_address || null,
+                representative_name || null,
+                pan_card_number || null,
+                aadhar_number || null,
+                feedback || null,
+            ];
+
+            console.log("Values array:", values, "Length:", values.length);
+
+            await queryAsync("START TRANSACTION");
             const userResult = await queryAsync(
                 `INSERT INTO crm_users (
                     user_type, name, mobile, email, password, photo, status,
                     created_date, created_time, updated_date, updated_time,
                     state, city, location, address, pincode, gst_number, rera_number,
-                    created_by, created_user_id,created_user_type,company_name, company_number,
+                    created_by, created_user_id, created_user_type, company_name, company_number,
                     company_address, representative_name, pan_card_number, aadhar_number, feedback
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    parseInt(user_type),
-                    name,
-                    mobile,
-                    email,
-                    hashedPassword,
-                    photo,
-                    parseInt(status),
-                    currentDate,
-                    currentTime,
-                    currentDate,
-                    currentTime,
-                    state,
-                    city,
-                    location,
-                    address || null,
-                    pincode,
-                    gst_number || null,
-                    rera_number || null,
-                    created_by,
-                    parseInt(created_user_id),
-                    parseInt(created_user_type),
-                    company_name || null,
-                    company_number || null,
-                    company_address || null,
-                    representative_name || null,
-                    pan_card_number || null,
-                    aadhar_number || null,
-                    feedback || null
-                ]
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                values
             );
 
-            await queryAsync('COMMIT');
+            await queryAsync("COMMIT");
             res.status(201).json({
-                message: 'User inserted successfully',
-                user_id: userResult.insertId
+                message: "User inserted successfully",
+                user_id: userResult.insertId,
             });
-
         } catch (error) {
-            await queryAsync('ROLLBACK');
-            res.status(500).json({ error: 'Failed to insert user: ' + error.message });
+            await queryAsync("ROLLBACK");
+            res.status(500).json({ error: "Failed to insert user: " + error.message });
         }
-
-
-    })
-}
+    });
+};
 
 const editCrmUser = async (req, res) => {
     upload.fields([{ name: 'photo', maxCount: 1 }])(req, res, async (err) => {
