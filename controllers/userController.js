@@ -333,7 +333,7 @@ const deleteCrmUser = async (req, res) => {
     }
 
     try {
-        // Check if user to delete exists
+       
         const userResult = await queryAsync('SELECT user_type, created_user_id FROM crm_users WHERE id = ?', [parseInt(id)]);
         if (!userResult.length) {
             return res.status(404).json({ error: 'User not found' });
@@ -342,7 +342,7 @@ const deleteCrmUser = async (req, res) => {
         const userToDelete = userResult[0];
         const userTypeToDelete = userToDelete.user_type;
 
-        // Check if created_user_id exists and get their user_type
+       
         const deleterResult = await queryAsync('SELECT user_type FROM crm_users WHERE id = ?', [parseInt(created_user_id)]);
         if (!deleterResult.length) {
             return res.status(400).json({ error: 'Invalid created_user_id: User does not exist' });
@@ -366,14 +366,14 @@ const deleteCrmUser = async (req, res) => {
             return res.status(403).json({ error: 'Only Admin (1) or Builder (2) can delete users' });
         }
 
+        // Check for dependent records in lead_updates
+        const dependentRecords = await queryAsync('SELECT COUNT(*) as count FROM lead_updates WHERE updated_by_emp_id = ?', [parseInt(id)]);
+        if (dependentRecords[0].count > 0) {
+            return res.status(400).json({ error: 'Cannot delete user: They have associated lead updates. Please reassign or delete those records first.' });
+        }
+
         await queryAsync('START TRANSACTION');
-
-        // Delete dependent records in lead_updates
-        await queryAsync('DELETE FROM lead_updates WHERE updated_by_emp_id = ?', [parseInt(id)]);
-
-        // Delete the user
         await queryAsync('DELETE FROM crm_users WHERE id = ?', [parseInt(id)]);
-
         await queryAsync('COMMIT');
 
         res.status(200).json({ message: 'User deleted successfully' });
@@ -382,7 +382,6 @@ const deleteCrmUser = async (req, res) => {
         res.status(500).json({ error: 'Failed to delete user: ' + error.message });
     }
 };
-
 
 
 const updateUserStatus = async (req,res)=>{
