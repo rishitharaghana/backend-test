@@ -329,7 +329,7 @@ const deleteCrmUser = async (req, res) => {
     }
 
     if (isNaN(parseInt(created_user_id)) || isNaN(parseInt(created_user_type))) {
-        return res.status(400).json({ error: 'Missing or invalid  created_user_id, or created_user_type' });
+        return res.status(400).json({ error: 'Missing or invalid created_user_id or created_user_type' });
     }
 
     try {
@@ -352,16 +352,13 @@ const deleteCrmUser = async (req, res) => {
 
         // Permission checks
         if (deleterUserType === 1) {
-            // Admin can only delete Builder (user_type 2)
             if (userTypeToDelete !== 2) {
                 return res.status(403).json({ error: 'Admin can only delete Builder (user_type 2)' });
             }
         } else if (deleterUserType === 2) {
-            // Builder can only delete their own employees (user_type 3, 4, 5, 6, 7)
             if (![3, 4, 5, 6, 7].includes(userTypeToDelete)) {
                 return res.status(403).json({ error: 'Builder can only delete Channel Partner, Sales Manager, Telecallers, Marketing Agent, or Receptionists' });
             }
-            // Ensure the user being deleted was created by this builder
             if (userToDelete.created_user_id !== parseInt(created_user_id)) {
                 return res.status(403).json({ error: 'Builder can only delete their own employees' });
             }
@@ -370,11 +367,16 @@ const deleteCrmUser = async (req, res) => {
         }
 
         await queryAsync('START TRANSACTION');
+
+        // Delete dependent records in lead_updates
+        await queryAsync('DELETE FROM lead_updates WHERE updated_by_emp_id = ?', [parseInt(id)]);
+
+        // Delete the user
         await queryAsync('DELETE FROM crm_users WHERE id = ?', [parseInt(id)]);
+
         await queryAsync('COMMIT');
 
         res.status(200).json({ message: 'User deleted successfully' });
-
     } catch (error) {
         await queryAsync('ROLLBACK');
         res.status(500).json({ error: 'Failed to delete user: ' + error.message });
