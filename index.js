@@ -5,6 +5,7 @@ const propertyRouter = require('./routes/propertyRoutes');
 const userRouter = require('./routes/userRoutes');
 const authRouter = require('./routes/authRoutes');
 const leadsRouter = require('./routes/leadsRoutes');
+const localityRouter = require('./routes/localityRoutes');
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use('/api/v1', propertyRouter);
 app.use('/api/v1', authRouter);
 app.use('/api/v1', userRouter);
 app.use('/api/v1', leadsRouter);
+app.use('/api/v1',localityRouter);
 
 // Start server
 const port = 3000;
