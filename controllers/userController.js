@@ -12,7 +12,10 @@ const upload = createMulterInstance(uploadDir, allowedTypes);
 const queryAsync = util.promisify(pool.query).bind(pool);
 
 const insertCrmUser = async (req, res) => {
-    upload.fields([{ name: "photo", maxCount: 1 }])(req, res, async (err) => {
+    upload.fields([
+        { name: "photo", maxCount: 1 },
+        { name: "company_logo", maxCount: 1 }
+    ])(req, res, async (err) => {
         if (err) {
             return res.status(400).json({ error: "File upload error: " + err.message });
         }
@@ -137,6 +140,7 @@ const insertCrmUser = async (req, res) => {
 
             const baseDir = path.join(__dirname, "..");
             const photo = req.files && req.files["photo"] ? path.relative(baseDir, req.files["photo"][0].path) : null;
+            const company_logo = req.files && req.files["company_logo"] ? path.relative(baseDir, req.files["company_logo"][0].path) : null;
 
             const hashedPassword = await bcrypt.hash(password, 10);
             const currentDate = moment().format("YYYY-MM-DD");
@@ -172,7 +176,8 @@ const insertCrmUser = async (req, res) => {
                 aadhar_number || null,
                 feedback || null,
                 account_number || null,
-                ifsc_code || null 
+                ifsc_code || null,
+                company_logo || null,
             ];
 
             console.log("Values array:", values, "Length:", values.length);
@@ -185,8 +190,8 @@ const insertCrmUser = async (req, res) => {
                     state, city, location, address, pincode, gst_number, rera_number,
                     created_by, created_user_id, created_user_type, company_name, company_number,
                     company_address, representative_name, pan_card_number, aadhar_number, feedback,
-                    account_number, ifsc_code
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    account_number, ifsc_code, company_logo
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 values
             );
 

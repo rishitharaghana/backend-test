@@ -405,71 +405,72 @@ const getAllProperties = async (req, res) => {
 };
 
 const ongoingProject = async (req, res) => {
-    const { admin_user_id, admin_user_type } = req.query;
+  const { admin_user_id, admin_user_type } = req.query;
 
-    // Validate all required fields
-    if (!admin_user_id || isNaN(parseInt(admin_user_id))) {
-        return res.status(400).json({ error: 'Valid admin_user_id is required' });
+  
+  if (!admin_user_id || isNaN(parseInt(admin_user_id))) {
+    return res.status(400).json({ error: 'Valid admin_user_id is required' });
+  }
+  if (!admin_user_type || isNaN(parseInt(admin_user_type))) {
+    return res.status(400).json({ error: 'Valid admin_user_type is required' });
+  }
+
+  try {
+    const parsedAdminUserId = parseInt(admin_user_id);
+    const parsedAdminUserType = parseInt(admin_user_type);
+
+    const propertiesResult = await queryAsync(
+      `SELECT * FROM property 
+       WHERE upcoming_project = ? 
+       AND posted_by = ? 
+       AND user_id = ?
+       AND (stop_leads IS NULL OR stop_leads = 'No')`,
+      ['No', parsedAdminUserType, parsedAdminUserId]
+    );
+
+    if (propertiesResult.length === 0) {
+      return res.status(200).json({ message: 'No ongoing properties found', data: [] });
     }
-    if (!admin_user_type || isNaN(parseInt(admin_user_type))) {
-        return res.status(400).json({ error: 'Valid admin_user_type is required' });
-    }
 
-    try {
-        const parsedAdminUserId = parseInt(admin_user_id);
-        const parsedAdminUserType = parseInt(admin_user_type);
+    const sizesResult = await queryAsync(`SELECT * FROM sizes`);
+    const aroundThisResult = await queryAsync(`SELECT * FROM around_this`);
 
-        const propertiesResult = await queryAsync(
-            `SELECT * FROM property WHERE upcoming_project = ? AND posted_by = ? AND user_id = ?`,
-            ['No', parsedAdminUserType, parsedAdminUserId]
-        );
+    const sizesMap = new Map();
+    sizesResult.forEach(row => {
+      if (!sizesMap.has(row.property_id)) {
+        sizesMap.set(row.property_id, []);
+      }
+      sizesMap.get(row.property_id).push({
+        build_up_area: row.build_up_area,
+        carpet_area: row.carpet_area,
+        floor_plan: row.floor_plan,
+        create_date: row.create_date
+      });
+    });
 
-        if (propertiesResult.length === 0) {
-            return res.status(200).json({ message: 'No ongoing properties found', data: [] });
-        }
+    const aroundThisMap = new Map();
+    aroundThisResult.forEach(row => {
+      if (!aroundThisMap.has(row.property_id)) {
+        aroundThisMap.set(row.property_id, []);
+      }
+      aroundThisMap.get(row.property_id).push({
+        title: row.title,
+        distance: row.distance,
+        create_date: row.create_date
+      });
+    });
 
-        const sizesResult = await queryAsync(
-            `SELECT * FROM sizes`
-        );
-        const aroundThisResult = await queryAsync(
-            `SELECT * FROM around_this`
-        );
+    const properties = propertiesResult.map(property => ({
+      ...property,
+      sizes: sizesMap.get(property.property_id) || [],
+      around_this: aroundThisMap.get(property.property_id) || []
+    }));
 
-        const sizesMap = new Map();
-        sizesResult.forEach(row => {
-            if (!sizesMap.has(row.property_id)) {
-                sizesMap.set(row.property_id, []);
-            }
-            sizesMap.get(row.property_id).push({
-                build_up_area: row.build_up_area,
-                carpet_area: row.carpet_area,
-                floor_plan: row.floor_plan,
-                create_date: row.create_date
-            });
-        });
-
-        const aroundThisMap = new Map();
-        aroundThisResult.forEach(row => {
-            if (!aroundThisMap.has(row.property_id)) {
-                aroundThisMap.set(row.property_id, []);
-            }
-            aroundThisMap.get(row.property_id).push({
-                title: row.title,
-                distance: row.distance,
-                create_date: row.create_date
-            });
-        });
-
-        const properties = propertiesResult.map(property => ({
-            ...property,
-            sizes: sizesMap.get(property.property_id) || [],
-            around_this: aroundThisMap.get(property.property_id) || []
-        }));
-
-        res.status(200).json({ message: 'Ongoing properties fetched successfully', data: properties });
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch ongoing properties: ' + error.message });
-    }
+    res.status(200).json({ message: 'Ongoing properties fetched successfully', data: properties });
+  } catch (error) {
+    console.error('Error fetching ongoing properties:', error);
+    res.status(500).json({ error: 'Failed to fetch ongoing properties: ' + error.message });
+  }
 };
 
 const getUpcomingProperties = async (req, res) => {
@@ -540,4 +541,122 @@ const getUpcomingProperties = async (req, res) => {
     }
 };
 
-module.exports = { insertProperty,getPropertyById,getAllProperties,getUpcomingProperties,ongoingProject };
+
+const stopPropertyLeads = async (req, res) => {
+  const { property_id, admin_user_id, admin_user_type } = req.body;
+
+  
+  if (!property_id || isNaN(parseInt(property_id))) {
+    return res.status(400).json({ error: 'Valid property_id is required' });
+  }
+  if (!admin_user_id || isNaN(parseInt(admin_user_id))) {
+    return res.status(400).json({ error: 'Valid admin_user_id is required' });
+  }
+  if (!admin_user_type || isNaN(parseInt(admin_user_type))) {
+    return res.status(400).json({ error: 'Valid admin_user_type is required' });
+  }
+
+  try {
+    const parsedPropertyId = parseInt(property_id);
+    const parsedAdminUserId = parseInt(admin_user_id);
+    const parsedAdminUserType = parseInt(admin_user_type);
+
+    
+    const propertyCheck = await queryAsync(
+      `SELECT property_id FROM property WHERE property_id = ? AND user_id = ? AND posted_by = ?`,
+      [parsedPropertyId, parsedAdminUserId, parsedAdminUserType]
+    );
+
+    if (propertyCheck.length === 0) {
+      return res.status(404).json({ error: 'Property not found or user not authorized' });
+    }
+
+   
+    const updateResult = await queryAsync(
+      `UPDATE property SET stop_leads = 'Yes' WHERE property_id = ?`,
+      [parsedPropertyId]
+    );
+
+    if (updateResult.affectedRows === 0) {
+      return res.status(500).json({ error: 'Failed to stop leads for the property' });
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: `Leads stopped successfully for property ID ${parsedPropertyId}`
+    });
+  } catch (error) {
+    console.error('Error stopping property leads:', error);
+    res.status(500).json({ error: 'Failed to stop property leads: ' + error.message });
+  }
+};
+
+const getStoppedProperties = async (req, res) => {
+  const { admin_user_id, admin_user_type } = req.query;
+
+  
+  if (!admin_user_id || isNaN(parseInt(admin_user_id))) {
+    return res.status(400).json({ error: 'Valid admin_user_id is required' });
+  }
+  if (!admin_user_type || isNaN(parseInt(admin_user_type))) {
+    return res.status(400).json({ error: 'Valid admin_user_type is required' });
+  }
+
+  try {
+    const parsedAdminUserId = parseInt(admin_user_id);
+    const parsedAdminUserType = parseInt(admin_user_type);
+
+    const propertiesResult = await queryAsync(
+      `SELECT * FROM property 
+       WHERE stop_leads = 'Yes'
+       AND posted_by = ? 
+       AND user_id = ?`,
+      [parsedAdminUserType, parsedAdminUserId]
+    );
+
+    if (propertiesResult.length === 0) {
+      return res.status(200).json({ message: 'No stopped properties found', data: [] });
+    }
+
+    const sizesResult = await queryAsync(`SELECT * FROM sizes`);
+    const aroundThisResult = await queryAsync(`SELECT * FROM around_this`);
+
+    const sizesMap = new Map();
+    sizesResult.forEach(row => {
+      if (!sizesMap.has(row.property_id)) {
+        sizesMap.set(row.property_id, []);
+      }
+      sizesMap.get(row.property_id).push({
+        build_up_area: row.build_up_area,
+        carpet_area: row.carpet_area,
+        floor_plan: row.floor_plan,
+        create_date: row.create_date
+      });
+    });
+
+    const aroundThisMap = new Map();
+    aroundThisResult.forEach(row => {
+      if (!aroundThisMap.has(row.property_id)) {
+        aroundThisMap.set(row.property_id, []);
+      }
+      aroundThisMap.get(row.property_id).push({
+        title: row.title,
+        distance: row.distance,
+        create_date: row.create_date
+      });
+    });
+
+    const properties = propertiesResult.map(property => ({
+      ...property,
+      sizes: sizesMap.get(property.property_id) || [],
+      around_this: aroundThisMap.get(property.property_id) || []
+    }));
+
+    res.status(200).json({ message: 'Stopped properties fetched successfully', data: properties });
+  } catch (error) {
+    console.error('Error fetching stopped properties:', error);
+    res.status(500).json({ error: 'Failed to fetch stopped properties: ' + error.message });
+  }
+};
+
+module.exports = { insertProperty,getPropertyById,getAllProperties,getUpcomingProperties,ongoingProject,stopPropertyLeads,getStoppedProperties };
