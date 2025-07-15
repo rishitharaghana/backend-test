@@ -197,8 +197,5 @@ const createBuilderQuery = async (req, res) => {
 };
 
 
-const getAllBuilders = async (req,res) => {
-    const {admin_user_type,admin_user_id} = req.query;
-}
 
 module.exports = { getBuilderQueries, createBuilderQuery };
