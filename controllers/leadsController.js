@@ -688,10 +688,13 @@ const getBookedLeads = async (req, res) => {
         bp.sqft,
         bp.budget,
         p.project_name,
-        p.property_subtype
+        p.property_subtype,
+        p2.state,
+        p2.city
       FROM leads l
       LEFT JOIN booked_properties bp ON l.lead_id = bp.lead_id
       LEFT JOIN property p ON bp.property_id = p.property_id
+       LEFT JOIN property p2 ON l.interested_project_id = p2.property_id
       WHERE l.lead_added_user_type = ? AND l.lead_added_user_id = ? AND l.booked = 'Yes'
     `;
     const queryParams = [lead_added_user_type, lead_added_user_id];

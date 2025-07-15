@@ -41,6 +41,8 @@ const insertCrmUser = async (req, res) => {
             pan_card_number,
             aadhar_number,
             feedback,
+            account_number,
+            ifsc_code
         } = req.body;
 
         // Enhanced validation
@@ -95,6 +97,20 @@ const insertCrmUser = async (req, res) => {
 
         if (isNaN(parseInt(created_user_id))) {
             return res.status(400).json({ error: "created_user_id must be a valid integer" });
+        }
+
+         if (account_number && typeof account_number !== 'string') {
+            return res.status(400).json({ error: "account_number must be a string" });
+        }
+
+        if (ifsc_code) {
+            if (typeof ifsc_code !== 'string') {
+                return res.status(400).json({ error: "ifsc_code must be a string" });
+            }
+           
+            if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc_code)) {
+                return res.status(400).json({ error: "Invalid ifsc_code format. Must be 11 characters (e.g., SBIN0001234)" });
+            }
         }
 
         try {
@@ -155,6 +171,8 @@ const insertCrmUser = async (req, res) => {
                 pan_card_number || null,
                 aadhar_number || null,
                 feedback || null,
+                account_number || null,
+                ifsc_code || null 
             ];
 
             console.log("Values array:", values, "Length:", values.length);
@@ -166,8 +184,9 @@ const insertCrmUser = async (req, res) => {
                     created_date, created_time, updated_date, updated_time,
                     state, city, location, address, pincode, gst_number, rera_number,
                     created_by, created_user_id, created_user_type, company_name, company_number,
-                    company_address, representative_name, pan_card_number, aadhar_number, feedback
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    company_address, representative_name, pan_card_number, aadhar_number, feedback,
+                    account_number, ifsc_code
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 values
             );
 
