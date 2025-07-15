@@ -577,24 +577,26 @@ const getUserTypesByBuilder = async (req, res) => {
 };
 
 const getUserTypesCount = async (req, res) => {
-  const { admin_user_type, admin_user_id,emp_id,emp_user_type } = req.query;
+  const { admin_user_type, admin_user_id, emp_id, emp_user_type } = req.query;
 
   try {
     let result = [];
 
-    if (!admin_user_type || isNaN(parseInt(admin_user_type))){
-        return res.status(400).json({ error: "admin_user_type is required and must be a valid integer" });
+    // Validate admin_user_type and admin_user_id
+    if (!admin_user_type || isNaN(parseInt(admin_user_type))) {
+      return res.status(400).json({ error: 'admin_user_type is required and must be a valid integer' });
     }
     if (!admin_user_id || isNaN(parseInt(admin_user_id))) {
-      return res.status(400).json({ error: "admin_user_id is required and must be a valid integer" });
+      return res.status(400).json({ error: 'admin_user_id is required and must be a valid integer' });
     }
     const parsedAdminUserType = parseInt(admin_user_type);
-    const parsedAdminUserId  = parseInt(admin_user_id);
+    const parsedAdminUserId = parseInt(admin_user_id);
 
-    const today = moment().format("YYYY-MM-DD");
+    const today = moment().format('YYYY-MM-DD');
 
-    if (parsedAdminUserType === 2  && parsedAdminUserId) {
-        const leadsResult = await queryAsync(
+    // Case 1: admin_user_type = 2 (Builder) without emp_id/emp_user_type
+    if (parsedAdminUserType === 2 && parsedAdminUserId && !emp_id && !emp_user_type) {
+      const leadsResult = await queryAsync(
         `SELECT 
           SUM(CASE WHEN status_id = 1 AND booked = 'No' THEN 1 ELSE 0 END) as new_leads_count,
           SUM(CASE WHEN created_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_leads_count,
@@ -602,16 +604,15 @@ const getUserTypesCount = async (req, res) => {
           SUM(CASE WHEN status_id = 5 AND booked = 'No' THEN 1 ELSE 0 END) as site_visit_done_count,
           SUM(CASE WHEN booked = 'Yes' THEN 1 ELSE 0 END) as booked_count
          FROM leads 
-         WHERE (lead_added_user_id = ? OR assigned_id IS NOT NULL)`,
+         WHERE lead_added_user_id = ? OR assigned_id IS NOT NULL`,
         [today, today, parsedAdminUserId]
       );
 
       result = [
-       
-        { user_type: "today_leads", count: leadsResult[0].today_leads_count || 0 },
-        { user_type: "today_follow_ups", count: leadsResult[0].today_follow_ups_count || 0 },
-        { user_type: "site_visit_done", count: leadsResult[0].site_visit_done_count || 0 },
-        { user_type: "booked", count: leadsResult[0].booked_count || 0 },
+        { user_type: 'today_leads', count: leadsResult[0].today_leads_count || 0 },
+        { user_type: 'today_follow_ups', count: leadsResult[0].today_follow_ups_count || 0 },
+        { user_type: 'site_visit_done', count: leadsResult[0].site_visit_done_count || 0 },
+        { user_type: 'booked', count: leadsResult[0].booked_count || 0 },
       ];
 
       // Add project count for builder
@@ -621,7 +622,7 @@ const getUserTypesCount = async (req, res) => {
          WHERE posted_by = ? AND user_id = ?`,
         [parsedAdminUserType, parsedAdminUserId]
       );
-      result.push({ user_type: "projects", count: projectsResult[0].project_count });
+      result.push({ user_type: 'projects', count: projectsResult[0].project_count });
 
       // Add user type counts for employees under builder
       const usersResult = await queryAsync(
@@ -633,11 +634,26 @@ const getUserTypesCount = async (req, res) => {
       );
       result.push(...usersResult.map((row) => ({ user_type: row.user_type, count: row.count })));
     } 
-    if ((emp_id && emp_user_type && !isNaN(parseInt(emp_id)) && !isNaN(parseInt(emp_user_type))) && (parsedAdminUserType === 2  && parsedAdminUserId)) {
+    // Case 2: admin_user_type = 2 with emp_id and emp_user_type
+    else if (
+      emp_id &&
+      emp_user_type &&
+      !isNaN(parseInt(emp_id)) &&
+      !isNaN(parseInt(emp_user_type)) &&
+      parsedAdminUserType === 2 &&
+      parsedAdminUserId
+    ) {
       const parsedEmpId = parseInt(emp_id);
       const parsedEmpUserType = parseInt(emp_user_type);
 
-      
+      // Validate emp_user_type is one of [3, 4, 5, 6, 7]
+      if (![3, 4, 5, 6, 7].includes(parsedEmpUserType)) {
+        return res.status(400).json({
+          error: 'Invalid emp_user_type. Must be one of 3, 4, 5, 6, or 7',
+        });
+      }
+
+      // Get project count for builder
       const projectsResult = await queryAsync(
         `SELECT COUNT(*) as project_count 
          FROM property 
@@ -645,39 +661,45 @@ const getUserTypesCount = async (req, res) => {
         [parsedAdminUserType, parsedAdminUserId]
       );
 
-     
+      // Get leads counts for employee
       const leadsResult = await queryAsync(
         `SELECT 
-
-            SUM(CASE WHEN status_id = 1 AND booked = 'No' THEN 1 ELSE 0 END) as new_leads_count,
-            SUM(CASE WHEN created_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_leads_count,
-            SUM(CASE WHEN next_action IS NOT NULL AND updated_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_follow_ups_count,
-            SUM(CASE WHEN status_id = 5 AND booked = 'No' THEN 1 ELSE 0 END) as site_visit_done_count,
-            SUM(CASE WHEN booked = 'Yes' THEN 1 ELSE 0 END) as booked_count
+          SUM(CASE WHEN status_id = 1 AND booked = 'No' THEN 1 ELSE 0 END) as new_leads_count,
+          SUM(CASE WHEN created_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_leads_count,
+          SUM(CASE WHEN next_action IS NOT NULL AND updated_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_follow_ups_count,
+          SUM(CASE WHEN status_id = 5 AND booked = 'No' THEN 1 ELSE 0 END) as site_visit_done_count,
+          SUM(CASE WHEN booked = 'Yes' THEN 1 ELSE 0 END) as booked_count
         FROM leads 
         WHERE assigned_id = ? 
-            AND assigned_user_type = ? 
-            AND lead_added_user_type = ? 
-            AND lead_added_user_id = ?`,
+          AND assigned_user_type = ? 
+          AND lead_added_user_type = ? 
+          AND lead_added_user_id = ?`,
         [today, today, parsedEmpId, parsedEmpUserType, parsedAdminUserType, parsedAdminUserId]
-        );
+      );
 
+      // For emp_user_type = 3, include booked; for 4, 5, 6, 7, exclude booked
       result = [
-       
-        { user_type: "today_leads", count: leadsResult[0].new_leads_count || 0 },
-        { user_type: "today_follow_ups", count: leadsResult[0].today_follow_ups_count || 0 },
-        { user_type: "site_visit_done", count: leadsResult[0].site_visit_done_count || 0 },
-       
+        { user_type: 'today_leads', count: leadsResult[0].today_leads_count || 0 },
+        { user_type: 'today_follow_ups', count: leadsResult[0].today_follow_ups_count || 0 },
+        { user_type: 'site_visit_done', count: leadsResult[0].site_visit_done_count || 0 },
       ];
-    } else if (parsedAdminUserType !== 2) {
-      return res.status(400).json({ error: "Invalid admin_user_type or missing emp_id and emp_user_type for non-builder" });
+      if (parsedEmpUserType === 3) {
+        result.push({ user_type: 'booked', count: leadsResult[0].booked_count || 0 });
+      }
+      result.push({ user_type: 'projects', count: projectsResult[0].project_count || 0 });
+    } else {
+      return res.status(400).json({
+        error: 'Invalid admin_user_type or missing emp_id and emp_user_type for non-builder',
+      });
     }
-    res.status(200).json({ message: "Data fetched successfully", data: result });
+
+    res.status(200).json({ message: 'Data fetched successfully', data: result });
   } catch (error) {
-    console.error("Error fetching user types count:", { error, queryParams: req.query });
-    res.status(500).json({ error: "Failed to fetch data: " + error.message });
+    console.error('Error fetching user types count:', { error, queryParams: req.query });
+    res.status(500).json({ error: 'Failed to fetch data: ' + error.message });
   }
 };
+
 
 const getUserProfile = async (req, res) => {
   const { admin_user_type, admin_user_id, emp_id, emp_user_type } = req.query;

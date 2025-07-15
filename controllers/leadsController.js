@@ -645,7 +645,7 @@ const getBookedLeads = async (req, res) => {
     });
   }
 
-  // Validate lead_id if provided
+
   let parsedLeadId;
   if (lead_id) {
     parsedLeadId = parseInt(lead_id, 10);
@@ -657,7 +657,7 @@ const getBookedLeads = async (req, res) => {
     }
   }
 
-  // Validate assigned_user_type and assigned_id if both are provided
+  
   if ((assigned_user_type && !assigned_id) || (!assigned_user_type && assigned_id)) {
     return res.status(400).json({
       status: 'error',
