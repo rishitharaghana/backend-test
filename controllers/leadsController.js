@@ -323,9 +323,10 @@ const getLeadsByUser = async (req, res) => {
   }
   try {
     let query = `
-      SELECT l.*, ls.status_name 
+      SELECT l.*, ls.status_name,p.state,p.city
       FROM leads l 
       JOIN lead_statuses ls ON l.status_id = ls.status_id 
+      JOIN property p ON l.interested_project_id = p.property_id
       WHERE l.lead_added_user_type = ? AND l.lead_added_user_id = ? AND l.booked = 'No'
     `;
     const queryParams = [lead_added_user_type, lead_added_user_id];
@@ -608,10 +609,12 @@ const getLeadUpdatesByLeadId = async (req, res) => {
   }
 
   try {
-    const query = `
-      SELECT lu.*, ls.status_name, lu.lead_added_user_id, lu.lead_added_user_type
+     const query = `
+      SELECT lu.*, ls.status_name, lu.lead_added_user_id, lu.lead_added_user_type, l.interested_project_id, p.state, p.city
       FROM lead_updates lu 
       LEFT JOIN lead_statuses ls ON lu.status_id = ls.status_id 
+      JOIN leads l ON lu.lead_id = l.lead_id
+      LEFT JOIN property p ON l.interested_project_id = p.property_id
       WHERE lu.lead_id = ?
         AND lu.lead_added_user_type = ?
         AND lu.lead_added_user_id = ?
