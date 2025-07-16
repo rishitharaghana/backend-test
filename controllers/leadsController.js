@@ -41,7 +41,7 @@ const insertLead = async (req, res) => {
     });
   }
 
-  // Validate channel partner details for lead_source_id === 6
+  
   if (lead_source_id === 6 && (!assigned_id || !assigned_name || !assigned_emp_number)) {
     return res.status(400).json({
       status: "error",
@@ -50,8 +50,8 @@ const insertLead = async (req, res) => {
     });
   }
 
-  // Validate numeric fields
- const parsedInterestedProjectId = parseInt(interested_project_id, 10);
+
+  const parsedInterestedProjectId = parseInt(interested_project_id, 10);
   const parsedLeadSourceId = parseInt(lead_source_id, 10);
   const parsedAssignedUserType = assigned_user_type ? parseInt(assigned_user_type, 10) : null;
   const parsedAssignedId = assigned_id ? parseInt(assigned_id, 10) : null;
@@ -72,28 +72,60 @@ const insertLead = async (req, res) => {
     });
   }
 
- try {
-    const projectCheck = await queryAsync("SELECT property_id FROM property WHERE property_id = ?", [parsedInterestedProjectId]);
+  
+  let values = [];
+  let insertQuery = "";
+
+  try {
+    // Check for duplicate lead based on customer_phone_number and interested_project_id
+    console.log("Checking for duplicate lead:", { customer_phone_number, parsedInterestedProjectId });
+    const duplicateLeadCheck = await queryAsync(
+      "SELECT lead_id, interested_project_name FROM leads WHERE customer_phone_number = ? AND interested_project_id = ?",
+      [customer_phone_number, parsedInterestedProjectId]
+    );
+    if (duplicateLeadCheck.length > 0) {
+      return res.status(400).json({
+        status: "error",
+        message: `Customer with phone number ${customer_phone_number} is already assigned to project ${duplicateLeadCheck[0].interested_project_name}`,
+      });
+    }
+
+    console.log("Checking project ID:", parsedInterestedProjectId);
+    const projectCheck = await queryAsync("SELECT property_id FROM property WHERE property_id = ?", [
+      parsedInterestedProjectId,
+    ]);
     if (projectCheck.length === 0) {
       return res.status(400).json({ status: "error", message: "Invalid interested_project_id" });
     }
-    const sourceCheck = await queryAsync("SELECT lead_source_id FROM lead_source WHERE lead_source_id = ?", [parsedLeadSourceId]);
+
+    console.log("Checking lead source ID:", parsedLeadSourceId);
+    const sourceCheck = await queryAsync("SELECT lead_source_id FROM lead_source WHERE lead_source_id = ?", [
+      parsedLeadSourceId,
+    ]);
     if (sourceCheck.length === 0) {
       return res.status(400).json({ status: "error", message: "Invalid lead_source_id" });
     }
+
     if (parsedAssignedId) {
+      console.log("Checking assigned ID:", parsedAssignedId);
       const userCheck = await queryAsync("SELECT id FROM crm_users WHERE id = ?", [parsedAssignedId]);
       if (userCheck.length === 0) {
         return res.status(400).json({ status: "error", message: "Invalid assigned_id" });
       }
     }
-    const leadAddedUserCheck = await queryAsync("SELECT id FROM crm_users WHERE id = ?", [parsedLeadAddedUserId]);
+
+    console.log("Checking lead added user ID:", parsedLeadAddedUserId);
+    const leadAddedUserCheck = await queryAsync("SELECT id FROM crm_users WHERE id = ?", [
+      parsedLeadAddedUserId,
+    ]);
     if (leadAddedUserCheck.length === 0) {
       return res.status(400).json({ status: "error", message: "Invalid lead_added_user_id" });
     }
 
-    // Fetch the default status_id for "Open"
-    const defaultStatusCheck = await queryAsync("SELECT status_id FROM lead_statuses WHERE is_default = TRUE LIMIT 1");
+    console.log("Checking default status...");
+    const defaultStatusCheck = await queryAsync(
+      "SELECT status_id FROM lead_statuses WHERE is_default = TRUE LIMIT 1"
+    );
     if (defaultStatusCheck.length === 0) {
       return res.status(500).json({ status: "error", message: "Default status not found in lead_statuses" });
     }
@@ -104,7 +136,7 @@ const insertLead = async (req, res) => {
     const updated_date = moment().format("YYYY-MM-DD");
     const updated_time = moment().format("HH:mm:ss");
 
-    const insertQuery = `
+    insertQuery = `
       INSERT INTO leads (
         customer_name, customer_phone_number, customer_email, interested_project_id,
         interested_project_name, lead_source_id, created_date, created_time, updated_date,
@@ -112,7 +144,7 @@ const insertLead = async (req, res) => {
         assigned_priority, lead_added_user_type, lead_added_user_id, status_id, sqft, budget
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const values = [
+    values = [
       customer_name,
       customer_phone_number,
       customer_email,
@@ -131,12 +163,11 @@ const insertLead = async (req, res) => {
       parsedLeadAddedUserType,
       parsedLeadAddedUserId,
       defaultStatusId,
-      sqft || null, 
-      budget || null, 
+      sqft || null,
+      budget || null,
     ];
 
-
- 
+    console.log("Inserting lead with values:", values);
     const result = await queryAsync(insertQuery, values);
 
     return res.status(201).json({
@@ -145,12 +176,6 @@ const insertLead = async (req, res) => {
       lead_id: result.insertId,
     });
   } catch (error) {
-    console.error("Insert Error:", {
-      error,
-      input: req.body,
-      values,
-      sql: insertQuery,
-    });
     return res.status(500).json({
       status: "error",
       message: "Failed to insert lead",
@@ -158,6 +183,7 @@ const insertLead = async (req, res) => {
     });
   }
 };
+
 
 const updateBookingDone = async (req, res) => {
   const { lead_id, 
