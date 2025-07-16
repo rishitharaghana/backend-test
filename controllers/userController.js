@@ -6,7 +6,7 @@ const util = require('util');
 const { createMulterInstance } = require('../config/multerConfig');
 
 
-const allowedTypes = { photo: ['.jpg', '.jpeg', '.png'] };
+const allowedTypes = { photo: ['.jpg', '.jpeg', '.png'], company_logo: ['.jpg', '.jpeg', '.png'] };
 const uploadDir = '../uploads/';
 const upload = createMulterInstance(uploadDir, allowedTypes);
 const queryAsync = util.promisify(pool.query).bind(pool);
