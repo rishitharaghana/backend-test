@@ -602,10 +602,10 @@ const getUserTypesCount = async (req, res) => {
           SUM(CASE WHEN created_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_leads_count,
           SUM(CASE WHEN next_action IS NOT NULL AND updated_date = ? AND booked = 'No' THEN 1 ELSE 0 END) as today_follow_ups_count,
           SUM(CASE WHEN status_id = 5 AND booked = 'No' THEN 1 ELSE 0 END) as site_visit_done_count,
-          SUM(CASE WHEN booked = 'Yes' THEN 1 ELSE 0 END) as booked_count
+          SUM(CASE WHEN booked = 'Yes' AND lead_added_user_id = ? THEN 1 ELSE 0 END) as booked_count
          FROM leads 
-         WHERE lead_added_user_id = ? OR assigned_id IS NOT NULL`,
-        [today, today, parsedAdminUserId]
+         WHERE lead_added_user_id = ? AND lead_added_user_type = ?`,
+        [today, today, parsedAdminUserId, parsedAdminUserId, parsedAdminUserType]
       );
 
       result = [
@@ -677,7 +677,6 @@ const getUserTypesCount = async (req, res) => {
         [today, today, parsedEmpId, parsedEmpUserType, parsedAdminUserType, parsedAdminUserId]
       );
 
-      // For emp_user_type = 3, include booked; for 4, 5, 6, 7, exclude booked
       result = [
         { user_type: 'today_leads', count: leadsResult[0].today_leads_count || 0 },
         { user_type: 'today_follow_ups', count: leadsResult[0].today_follow_ups_count || 0 },
@@ -699,7 +698,6 @@ const getUserTypesCount = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch data: ' + error.message });
   }
 };
-
 
 const getUserProfile = async (req, res) => {
   const { admin_user_type, admin_user_id, emp_id, emp_user_type } = req.query;
