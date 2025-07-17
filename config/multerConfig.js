@@ -3,11 +3,10 @@ const path = require('path');
 const fs = require('fs');
 
 const createStorage = (uploadDir) => {
-    const fullUploadDir = path.join(__dirname, uploadDir);
+    const fullUploadDir = path.resolve(__dirname, uploadDir);
     if (!fs.existsSync(fullUploadDir)) {
         fs.mkdirSync(fullUploadDir, { recursive: true });
     }
-
     return multer.diskStorage({
         destination: (req, file, cb) => {
             cb(null, fullUploadDir);
@@ -21,7 +20,6 @@ const createStorage = (uploadDir) => {
 
 const createFileFilter = (allowedTypes) => {
     return (req, file, cb) => {
-       
         const ext = path.extname(file.originalname).toLowerCase();
         if (allowedTypes[file.fieldname] && allowedTypes[file.fieldname].includes(ext)) {
             cb(null, true);
@@ -31,7 +29,7 @@ const createFileFilter = (allowedTypes) => {
     };
 };
 
-const createMulterInstance = (uploadDir, allowedTypes = {}, limits = { fileSize: 5 * 1024 * 1024 }) => {
+const createMulterInstance = (uploadDir, allowedTypes = {}, limits = { fileSize: 20 * 1024 * 1024 }) => {
     const storage = createStorage(uploadDir);
     const fileFilter = createFileFilter(allowedTypes);
 

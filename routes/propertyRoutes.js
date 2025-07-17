@@ -1,11 +1,12 @@
 const express = require('express');
-const { insertProperty, getPropertyById, getAllProperties, getUpcomingProperties, ongoingProject, getStoppedProperties, stopPropertyLeads } = require('../controllers/propertyController');
+const { insertProperty, getPropertyById, getAllProperties, getUpcomingProperties, ongoingProject, getStoppedProperties, stopPropertyLeads, editProperty } = require('../controllers/propertyController');
 const { authenticateToken } = require('../middlewares/authenticate');
 const router = express.Router();
 
 
 
 router.post('/insertproperty',authenticateToken,insertProperty);
+router.post('/editproperty',authenticateToken,editProperty);
 router.get('/properties', authenticateToken,getAllProperties); 
 router.get('/propertiesbyId',authenticateToken, getPropertyById);
 router.get('/ongoingprojects',authenticateToken,ongoingProject)

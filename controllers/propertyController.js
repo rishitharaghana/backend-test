@@ -1,9 +1,9 @@
 const moment = require('moment');
-const pool = require('../config/db');
 const util = require('util');
-const { createMulterInstance } = require('../config/multerConfig');
+const fs = require('fs').promises;
 const path = require('path');
-
+const { createMulterInstance } = require('../config/multerConfig');
+const pool = require('../config/db');
 
 const uploadDir = '../uploads/';
 const allowedTypes = {
@@ -11,7 +11,7 @@ const allowedTypes = {
     'price_sheet': ['.pdf'],
     'floor_plan': ['.png', '.jpg', '.jpeg', '.pdf']
 };
-const upload = createMulterInstance(uploadDir, allowedTypes, { fileSize: 20 * 1024 * 1024 }); 
+const upload = createMulterInstance(uploadDir, allowedTypes, { fileSize: 20 * 1024 * 1024 });
 
 const queryAsync = util.promisify(pool.query).bind(pool);
 
@@ -46,7 +46,6 @@ const insertProperty = async (req, res) => {
             around_this
         } = req.body;
 
-        // Validate required fields
         if (
             !project_name ||
             !property_type ||
@@ -66,24 +65,21 @@ const insertProperty = async (req, res) => {
             return res.status(400).json({ error: 'Missing required property fields' });
         }
 
-        // Validate construction_status
         if (construction_status !== 'Ready to Move' && construction_status !== 'Under Construction') {
             return res.status(400).json({ error: 'Invalid construction_status value' });
         }
 
-        // Validate possession_end_date
         const possessionEndDate = req.body.possession_end_date;
         if (construction_status === 'Under Construction' && !possessionEndDate) {
             return res.status(400).json({ error: 'possession_end_date is required for Under Construction' });
         }
         if (possessionEndDate && !moment(possessionEndDate, 'YYYY-MM-DD', true).isValid()) {
-            return res.status(400).json({ error: 'possession_end_date must be in YYYY-MM-DD format (e.g., 2025-07-01)' });
+            return res.status(400).json({ error: 'possession_end_date must be in YYYY-MM-DD format' });
         }
         if (construction_status === 'Ready to Move' && possessionEndDate) {
             return res.status(400).json({ error: 'possession_end_date must be null for Ready to Move' });
         }
 
-        // Validate rera_registered and rera_number
         if (rera_registered !== 'Yes' && rera_registered !== 'No') {
             return res.status(400).json({ error: 'Invalid rera_registered value' });
         }
@@ -94,7 +90,6 @@ const insertProperty = async (req, res) => {
             return res.status(400).json({ error: 'rera_number must be null when rera_registered is No' });
         }
 
-     
         let paymentModeArray;
         try {
             paymentModeArray = JSON.parse(payment_mode);
@@ -109,7 +104,6 @@ const insertProperty = async (req, res) => {
             return res.status(400).json({ error: 'Invalid payment_mode values' });
         }
 
-       
         if (!['Pre Launch', 'Soft Launch', 'Launched'].includes(launch_type)) {
             return res.status(400).json({ error: 'Invalid launch_type value' });
         }
@@ -117,28 +111,25 @@ const insertProperty = async (req, res) => {
             return res.status(400).json({ error: 'launched_date is required when launch_type is Launched' });
         }
         if (launched_date && !moment(launched_date, 'YYYY-MM-DD', true).isValid()) {
-            return res.status(400).json({ error: 'launched_date must be in YYYY-MM-DD format (e.g., 2025-07-01)' });
+            return res.status(400).json({ error: 'launched_date must be in YYYY-MM-DD format' });
         }
         if (launch_type !== 'Launched' && launched_date) {
             return res.status(400).json({ error: 'launched_date must be null when launch_type is not Launched' });
         }
 
-        
         if (isNaN(parseInt(user_id)) || isNaN(parseInt(posted_by))) {
             return res.status(400).json({ error: 'user_id and posted_by must be valid integers' });
         }
 
-       
         const baseDir = path.join(__dirname, '..');
-        const brochure = req.files['brochure'] ? path.relative(baseDir, req.files['brochure'][0].path) : null;
-        const price_sheet = req.files['price_sheet'] ? path.relative(baseDir, req.files['price_sheet'][0].path) : null;
-        const floor_plans = req.files['floor_plan'] ? req.files['floor_plan'].map(file => path.relative(baseDir, file.path)) : [];
+        const brochure = req.files['brochure'] ? path.basename(req.files['brochure'][0].path) : null;
+        const price_sheet = req.files['price_sheet'] ? path.basename(req.files['price_sheet'][0].path) : null;
+        const floor_plans = req.files['floor_plan'] ? req.files['floor_plan'].map(file => path.basename(file.path)) : [];
 
         try {
             await queryAsync('START TRANSACTION');
             const currentTimestamp = moment().format('YYYY-MM-DD HH:mm:ss');
 
-            
             const formattedPossessionDate = possessionEndDate
                 ? moment(possessionEndDate, 'YYYY-MM-DD').format('YYYY-MM-DD')
                 : null;
@@ -146,13 +137,12 @@ const insertProperty = async (req, res) => {
                 ? moment(launched_date, 'YYYY-MM-DD').format('YYYY-MM-DD')
                 : null;
 
-           
             const propertyResult = await queryAsync(
                 `INSERT INTO property (
-                    project_name, property_type, property_subtype, builder_name, 
-                    state, city, locality, brochure, price_sheet, 
-                    construction_status, upcoming_project, posted_by, 
-                    possession_end_date, rera_registered, rera_number, 
+                    project_name, property_type, property_subtype, builder_name,
+                    state, city, locality, brochure, price_sheet,
+                    construction_status, upcoming_project, posted_by,
+                    possession_end_date, rera_registered, rera_number,
                     launch_type, launched_date, created_date, user_id
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
@@ -179,7 +169,6 @@ const insertProperty = async (req, res) => {
             );
             const property_id = propertyResult.insertId;
 
-           
             let sizesArray;
             try {
                 sizesArray = JSON.parse(sizes);
@@ -201,7 +190,7 @@ const insertProperty = async (req, res) => {
                         !isNaN(parseFloat(size.sqftprice))
                     ) {
                         await queryAsync(
-                            `INSERT INTO sizes (property_id, build_up_area, carpet_area, floor_plan, sqft_price, create_date) 
+                            `INSERT INTO sizes (property_id, build_up_area, carpet_area, floor_plan, sqft_price, create_date)
                              VALUES (?, ?, ?, ?, ?, ?)`,
                             [
                                 property_id,
@@ -218,7 +207,6 @@ const insertProperty = async (req, res) => {
                 }
             }
 
-         
             let aroundThisArray;
             try {
                 aroundThisArray = JSON.parse(around_this);
@@ -227,13 +215,9 @@ const insertProperty = async (req, res) => {
             }
             if (Array.isArray(aroundThisArray) && aroundThisArray.length > 0) {
                 for (let place of aroundThisArray) {
-                    if (
-                        place.title &&
-                        place.distance &&
-                        !isNaN(parseFloat(place.distance))
-                    ) {
+                    if (place.title && place.distance && !isNaN(parseFloat(place.distance))) {
                         await queryAsync(
-                            `INSERT INTO around_this (property_id, title, distance, create_date) 
+                            `INSERT INTO around_this (property_id, title, distance, create_date)
                              VALUES (?, ?, ?, ?)`,
                             [
                                 property_id,
@@ -248,16 +232,11 @@ const insertProperty = async (req, res) => {
                 }
             }
 
-           
             for (let mode of paymentModeArray) {
                 await queryAsync(
-                    `INSERT INTO payment_modes (property_id, payment_mode, create_date) 
+                    `INSERT INTO payment_modes (property_id, payment_mode, create_date)
                      VALUES (?, ?, ?)`,
-                    [
-                        property_id,
-                        mode,
-                        currentTimestamp
-                    ]
+                    [property_id, mode, currentTimestamp]
                 );
             }
 
@@ -273,11 +252,308 @@ const insertProperty = async (req, res) => {
     });
 };
 
+const editProperty = async (req, res) => {
+    upload.fields([
+        { name: 'brochure', maxCount: 1 },
+        { name: 'price_sheet', maxCount: 1 },
+        { name: 'floor_plan', maxCount: 4 }
+    ])(req, res, async (err) => {
+        if (err) {
+            return res.status(400).json({ error: 'File upload error: ' + err.message });
+        }
+
+        const {
+            property_id,
+            project_name,
+            property_type,
+            property_subtype,
+            builder_name,
+            state,
+            city,
+            locality,
+            construction_status,
+            upcoming_project,
+            posted_by,
+            user_id,
+            rera_registered,
+            rera_number,
+            payment_mode,
+            launch_type,
+            launched_date,
+            sizes,
+            around_this,
+            possession_end_date
+        } = req.body;
+
+        if (
+            !property_id ||
+            !project_name ||
+            !property_type ||
+            !property_subtype ||
+            !builder_name ||
+            !state ||
+            !city ||
+            !locality ||
+            !construction_status ||
+            !upcoming_project ||
+            !posted_by ||
+            !user_id ||
+            !rera_registered ||
+            !payment_mode ||
+            !launch_type
+        ) {
+            return res.status(400).json({ error: 'Missing required property fields' });
+        }
+
+        if (isNaN(parseInt(property_id))) {
+            return res.status(400).json({ error: 'Invalid property_id' });
+        }
+
+        if (construction_status !== 'Ready to Move' && construction_status !== 'Under Construction') {
+            return res.status(400).json({ error: 'Invalid construction_status value' });
+        }
+
+        if (construction_status === 'Under Construction' && !possession_end_date) {
+            return res.status(400).json({ error: 'possession_end_date is required for Under Construction' });
+        }
+        if (possession_end_date && !moment(possession_end_date, 'YYYY-MM-DD', true).isValid()) {
+            return res.status(400).json({ error: 'possession_end_date must be in YYYY-MM-DD format' });
+        }
+        if (construction_status === 'Ready to Move' && possession_end_date) {
+            return res.status(400).json({ error: 'possession_end_date must be null for Ready to Move' });
+        }
+
+        if (rera_registered !== 'Yes' && rera_registered !== 'No') {
+            return res.status(400).json({ error: 'Invalid rera_registered value' });
+        }
+        if (rera_registered === 'Yes' && !rera_number) {
+            return res.status(400).json({ error: 'rera_number is required when rera_registered is Yes' });
+        }
+        if (rera_registered === 'No' && rera_number) {
+            return res.status(400).json({ error: 'rera_number must be null when rera_registered is No' });
+        }
+
+        let paymentModeArray;
+        try {
+            paymentModeArray = JSON.parse(payment_mode);
+        } catch (error) {
+            return res.status(400).json({ error: 'Invalid payment_mode JSON format' });
+        }
+        if (!Array.isArray(paymentModeArray) || paymentModeArray.length === 0) {
+            return res.status(400).json({ error: 'payment_mode must be a non-empty array' });
+        }
+        const validPaymentModes = ['Regular', 'OTP', 'Offers', 'EMI'];
+        if (!paymentModeArray.every(mode => validPaymentModes.includes(mode))) {
+            return res.status(400).json({ error: 'Invalid payment_mode values' });
+        }
+
+        if (!['Pre Launch', 'Soft Launch', 'Launched'].includes(launch_type)) {
+            return res.status(400).json({ error: 'Invalid launch_type value' });
+        }
+        if (launch_type === 'Launched' && !launched_date) {
+            return res.status(400).json({ error: 'launched_date is required when launch_type is Launched' });
+        }
+        if (launched_date && !moment(launched_date, 'YYYY-MM-DD', true).isValid()) {
+            return res.status(400).json({ error: 'launched_date must be in YYYY-MM-DD format' });
+        }
+        if (launch_type !== 'Launched' && launched_date) {
+            return res.status(400).json({ error: 'launched_date must be null when launch_type is not Launched' });
+        }
+
+        if (isNaN(parseInt(user_id)) || isNaN(parseInt(posted_by))) {
+            return res.status(400).json({ error: 'user_id and posted_by must be valid integers' });
+        }
+
+        const baseDir = path.resolve(__dirname, '..', 'uploads'); 
+
+        try {
+            await queryAsync('START TRANSACTION');
+
+            const existingProperty = await queryAsync(
+                'SELECT brochure, price_sheet FROM property WHERE property_id = ?',
+                [parseInt(property_id)]
+            );
+            if (!existingProperty.length) {
+                await queryAsync('ROLLBACK');
+                return res.status(404).json({ error: 'Property not found' });
+            }
+
+            const existingFloorPlans = await queryAsync(
+                'SELECT floor_plan FROM sizes WHERE property_id = ? AND floor_plan IS NOT NULL',
+                [parseInt(property_id)]
+            );
+
+            // Delete old files unconditionally
+            if (existingProperty[0].brochure) {
+                try {
+                    await fs.unlink(path.join(baseDir, existingProperty[0].brochure));
+                } catch (error) {
+                    console.warn(`Failed to delete old brochure: ${error.message}`);
+                }
+            }
+            if (existingProperty[0].price_sheet) {
+                try {
+                    await fs.unlink(path.join(baseDir, existingProperty[0].price_sheet));
+                } catch (error) {
+                    console.warn(`Failed to delete old price sheet: ${error.message}`);
+                }
+            }
+            for (let floorPlan of existingFloorPlans) {
+                if (floorPlan.floor_plan) {
+                    try {
+                        await fs.unlink(path.join(baseDir, floorPlan.floor_plan));
+                    } catch (error) {
+                        console.warn(`Failed to delete old floor plan: ${error.message}`);
+                    }
+                }
+            }
+
+            // Prepare new file paths or retain existing ones
+            const brochure = req.files['brochure'] ? path.basename(req.files['brochure'][0].path) : (existingProperty[0].brochure || null);
+            const price_sheet = req.files['price_sheet'] ? path.basename(req.files['price_sheet'][0].path) : (existingProperty[0].price_sheet || null);
+            const floor_plans = req.files['floor_plan'] ? req.files['floor_plan'].map(file => path.basename(file.path)) : [];
+
+            const formattedPossessionDate = possession_end_date
+                ? moment(possession_end_date, 'YYYY-MM-DD').format('YYYY-MM-DD')
+                : null;
+            const formattedLaunchedDate = launched_date
+                ? moment(launched_date, 'YYYY-MM-DD').format('YYYY-MM-DD')
+                : null;
+            const currentTimestamp = moment().format('YYYY-MM-DD HH:mm:ss');
+
+            await queryAsync(
+                `UPDATE property SET
+                    project_name = ?,
+                    property_type = ?,
+                    property_subtype = ?,
+                    builder_name = ?,
+                    state = ?,
+                    city = ?,
+                    locality = ?,
+                    brochure = ?,
+                    price_sheet = ?,
+                    construction_status = ?,
+                    upcoming_project = ?,
+                    posted_by = ?,
+                    possession_end_date = ?,
+                    rera_registered = ?,
+                    rera_number = ?,
+                    launch_type = ?,
+                    launched_date = ?,
+                    user_id = ?
+                WHERE property_id = ?`,
+                [
+                    project_name,
+                    property_type,
+                    property_subtype,
+                    builder_name,
+                    state,
+                    city,
+                    locality,
+                    brochure,
+                    price_sheet,
+                    construction_status,
+                    upcoming_project,
+                    parseInt(posted_by),
+                    formattedPossessionDate,
+                    rera_registered,
+                    rera_number,
+                    launch_type,
+                    formattedLaunchedDate,
+                    parseInt(user_id),
+                    parseInt(property_id)
+                ]
+            );
+
+            let sizesArray;
+            try {
+                sizesArray = JSON.parse(sizes);
+            } catch (error) {
+                throw new Error('Invalid sizes JSON format');
+            }
+            if (Array.isArray(sizesArray) && sizesArray.length > 0) {
+                if (floor_plans.length > 0 && sizesArray.length !== floor_plans.length) {
+                    throw new Error(`Number of floor_plan files (${floor_plans.length}) must match number of sizes entries (${sizesArray.length})`);
+                }
+                await queryAsync('DELETE FROM sizes WHERE property_id = ?', [parseInt(property_id)]);
+                for (let i = 0; i < sizesArray.length; i++) {
+                    const size = sizesArray[i];
+                    if (
+                        size.build_up_area &&
+                        size.carpet_area &&
+                        !isNaN(parseFloat(size.build_up_area)) &&
+                        !isNaN(parseFloat(size.carpet_area)) &&
+                        size.sqftprice &&
+                        !isNaN(parseFloat(size.sqftprice))
+                    ) {
+                        await queryAsync(
+                            `INSERT INTO sizes (property_id, build_up_area, carpet_area, floor_plan, sqft_price, create_date)
+                             VALUES (?, ?, ?, ?, ?, ?)`,
+                            [
+                                parseInt(property_id),
+                                parseFloat(size.build_up_area).toString(),
+                                parseFloat(size.carpet_area).toString(),
+                                floor_plans[i] || null,
+                                parseFloat(size.sqftprice).toString(),
+                                currentTimestamp
+                            ]
+                        );
+                    } else {
+                        throw new Error('Invalid build_up_area, carpet_area, or sqftprice in sizes');
+                    }
+                }
+            }
+
+            let aroundThisArray;
+            try {
+                aroundThisArray = JSON.parse(around_this);
+            } catch (error) {
+                throw new Error('Invalid around_this JSON format');
+            }
+            if (Array.isArray(aroundThisArray) && aroundThisArray.length > 0) {
+                await queryAsync('DELETE FROM around_this WHERE property_id = ?', [parseInt(property_id)]);
+                for (let place of aroundThisArray) {
+                    if (place.title && place.distance && !isNaN(parseFloat(place.distance))) {
+                        await queryAsync(
+                            `INSERT INTO around_this (property_id, title, distance, create_date)
+                             VALUES (?, ?, ?, ?)`,
+                            [
+                                parseInt(property_id),
+                                place.title,
+                                parseFloat(place.distance).toString(),
+                                currentTimestamp
+                            ]
+                        );
+                    } else {
+                        throw new Error('Invalid title or distance in around_this');
+                    }
+                }
+            }
+
+            await queryAsync('DELETE FROM payment_modes WHERE property_id = ?', [parseInt(property_id)]);
+            for (let mode of paymentModeArray) {
+                await queryAsync(
+                    `INSERT INTO payment_modes (property_id, payment_mode, create_date)
+                     VALUES (?, ?, ?)`,
+                    [parseInt(property_id), mode, currentTimestamp]
+                );
+            }
+
+            await queryAsync('COMMIT');
+            res.status(200).json({
+                message: 'Property updated successfully',
+                property_id
+            });
+        } catch (error) {
+            await queryAsync('ROLLBACK');
+            res.status(500).json({ error: 'Failed to update property: ' + error.message });
+        }
+    });
+};
 
 const getPropertyById = async (req, res) => {
     const { property_id, admin_user_id, admin_user_type } = req.query;
 
-    
     if (!property_id || isNaN(parseInt(property_id))) {
         return res.status(400).json({ error: 'Valid property_id is required' });
     }
@@ -302,31 +578,38 @@ const getPropertyById = async (req, res) => {
             return res.status(404).json({ error: 'Property not found' });
         }
 
-        
         const sizesResult = await queryAsync(
             `SELECT * FROM sizes WHERE property_id = ?`,
             [parsedPropertyId]
         );
 
-      
         const aroundThisResult = await queryAsync(
             `SELECT * FROM around_this WHERE property_id = ?`,
             [parsedPropertyId]
         );
 
+        const paymentModesResult = await queryAsync(
+            `SELECT payment_mode FROM payment_modes WHERE property_id = ?`,
+            [parsedPropertyId]
+        );
+
+        const baseUrl = `http://localhost:3000/uploads/`; // Adjust for production
         const property = {
             ...propertyResult[0],
+            brochure: propertyResult[0].brochure ? `${baseUrl}${propertyResult[0].brochure}` : null,
+            price_sheet: propertyResult[0].price_sheet ? `${baseUrl}${propertyResult[0].price_sheet}` : null,
             sizes: sizesResult.map(row => ({
                 build_up_area: row.build_up_area,
                 carpet_area: row.carpet_area,
-                floor_plan: row.floor_plan,
+                floor_plan: row.floor_plan ? `${baseUrl}${row.floor_plan}` : null,
                 create_date: row.create_date
             })),
             around_this: aroundThisResult.map(row => ({
                 title: row.title,
                 distance: row.distance,
                 create_date: row.create_date
-            }))
+            })),
+            payment_modes: paymentModesResult.map(row => row.payment_mode)
         };
 
         res.status(200).json(property);
@@ -334,7 +617,6 @@ const getPropertyById = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch property: ' + error.message });
     }
 };
-
 
 const getAllProperties = async (req, res) => {
     const { admin_user_id, admin_user_type } = req.query;
@@ -658,4 +940,4 @@ const getStoppedProperties = async (req, res) => {
   }
 };
 
-module.exports = { insertProperty,getPropertyById,getAllProperties,getUpcomingProperties,ongoingProject,stopPropertyLeads,getStoppedProperties };
+module.exports = { insertProperty,getPropertyById,getAllProperties,getUpcomingProperties,ongoingProject,stopPropertyLeads,getStoppedProperties,editProperty };

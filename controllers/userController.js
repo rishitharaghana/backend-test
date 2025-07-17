@@ -5,7 +5,6 @@ const pool = require('../config/db');
 const util = require('util');
 const { createMulterInstance } = require('../config/multerConfig');
 
-
 const allowedTypes = { photo: ['.jpg', '.jpeg', '.png'], company_logo: ['.jpg', '.jpeg', '.png'] };
 const uploadDir = '../uploads/';
 const upload = createMulterInstance(uploadDir, allowedTypes);
@@ -48,7 +47,6 @@ const insertCrmUser = async (req, res) => {
             ifsc_code
         } = req.body;
 
-       
         if (
             !user_type ||
             !name ||
@@ -77,7 +75,6 @@ const insertCrmUser = async (req, res) => {
             typeof created_user_id === "undefined" ||
             typeof created_user_type === "undefined"
         ) {
-          
             return res.status(400).json({ error: "Missing or undefined required user fields" });
         }
 
@@ -102,7 +99,7 @@ const insertCrmUser = async (req, res) => {
             return res.status(400).json({ error: "created_user_id must be a valid integer" });
         }
 
-         if (account_number && typeof account_number !== 'string') {
+        if (account_number && typeof account_number !== 'string') {
             return res.status(400).json({ error: "account_number must be a string" });
         }
 
@@ -110,7 +107,6 @@ const insertCrmUser = async (req, res) => {
             if (typeof ifsc_code !== 'string') {
                 return res.status(400).json({ error: "ifsc_code must be a string" });
             }
-           
             if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc_code)) {
                 return res.status(400).json({ error: "Invalid ifsc_code format. Must be 11 characters (e.g., SBIN0001234)" });
             }
@@ -136,9 +132,9 @@ const insertCrmUser = async (req, res) => {
                 return res.status(403).json({ error: "Only Admin (1) or Builder (2) can create users" });
             }
 
-            const baseDir = path.join(__dirname, "..");
-            const photo = req.files && req.files["photo"] ? path.relative(baseDir, req.files["photo"][0].path) : null;
-            const company_logo = req.files && req.files["company_logo"] ? path.relative(baseDir, req.files["company_logo"][0].path) : null;
+            const baseDir = path.resolve(__dirname, '..', 'uploads'); // Match Multer's uploadDir
+            const photo = req.files && req.files["photo"] ? path.basename(req.files["photo"][0].path) : null;
+            const company_logo = req.files && req.files["company_logo"] ? path.basename(req.files["company_logo"][0].path) : null;
 
             const hashedPassword = await bcrypt.hash(password, 10);
             const currentDate = moment().format("YYYY-MM-DD");
@@ -201,6 +197,7 @@ const insertCrmUser = async (req, res) => {
         }
     });
 };
+
 
 const editCrmUser = async (req, res) => {
     upload.fields([{ name: 'photo', maxCount: 1 }])(req, res, async (err) => {
