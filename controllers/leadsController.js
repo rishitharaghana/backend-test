@@ -77,8 +77,8 @@ const insertLead = async (req, res) => {
   let insertQuery = "";
 
   try {
-    // Check for duplicate lead based on customer_phone_number and interested_project_id
-    console.log("Checking for duplicate lead:", { customer_phone_number, parsedInterestedProjectId });
+   
+    
     const duplicateLeadCheck = await queryAsync(
       "SELECT lead_id, interested_project_name FROM leads WHERE customer_phone_number = ? AND interested_project_id = ?",
       [customer_phone_number, parsedInterestedProjectId]
@@ -90,7 +90,7 @@ const insertLead = async (req, res) => {
       });
     }
 
-    console.log("Checking project ID:", parsedInterestedProjectId);
+    
     const projectCheck = await queryAsync("SELECT property_id FROM property WHERE property_id = ?", [
       parsedInterestedProjectId,
     ]);
@@ -98,7 +98,7 @@ const insertLead = async (req, res) => {
       return res.status(400).json({ status: "error", message: "Invalid interested_project_id" });
     }
 
-    console.log("Checking lead source ID:", parsedLeadSourceId);
+  
     const sourceCheck = await queryAsync("SELECT lead_source_id FROM lead_source WHERE lead_source_id = ?", [
       parsedLeadSourceId,
     ]);
@@ -107,14 +107,14 @@ const insertLead = async (req, res) => {
     }
 
     if (parsedAssignedId) {
-      console.log("Checking assigned ID:", parsedAssignedId);
+    
       const userCheck = await queryAsync("SELECT id FROM crm_users WHERE id = ?", [parsedAssignedId]);
       if (userCheck.length === 0) {
         return res.status(400).json({ status: "error", message: "Invalid assigned_id" });
       }
     }
 
-    console.log("Checking lead added user ID:", parsedLeadAddedUserId);
+    
     const leadAddedUserCheck = await queryAsync("SELECT id FROM crm_users WHERE id = ?", [
       parsedLeadAddedUserId,
     ]);
@@ -122,7 +122,7 @@ const insertLead = async (req, res) => {
       return res.status(400).json({ status: "error", message: "Invalid lead_added_user_id" });
     }
 
-    console.log("Checking default status...");
+    
     const defaultStatusCheck = await queryAsync(
       "SELECT status_id FROM lead_statuses WHERE is_default = TRUE LIMIT 1"
     );
@@ -167,7 +167,7 @@ const insertLead = async (req, res) => {
       budget || null,
     ];
 
-    console.log("Inserting lead with values:", values);
+   
     const result = await queryAsync(insertQuery, values);
 
     return res.status(201).json({

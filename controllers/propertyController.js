@@ -5,7 +5,7 @@ const { createMulterInstance } = require('../config/multerConfig');
 const path = require('path');
 
 
-const uploadDir = 'uploads/';
+const uploadDir = '../uploads/';
 const allowedTypes = {
     'brochure': ['.pdf'],
     'price_sheet': ['.pdf'],
@@ -468,7 +468,7 @@ const ongoingProject = async (req, res) => {
 
     res.status(200).json({ message: 'Ongoing properties fetched successfully', data: properties });
   } catch (error) {
-    console.error('Error fetching ongoing properties:', error);
+    
     res.status(500).json({ error: 'Failed to fetch ongoing properties: ' + error.message });
   }
 };
@@ -586,7 +586,7 @@ const stopPropertyLeads = async (req, res) => {
       message: `Leads stopped successfully for property ID ${parsedPropertyId}`
     });
   } catch (error) {
-    console.error('Error stopping property leads:', error);
+    
     res.status(500).json({ error: 'Failed to stop property leads: ' + error.message });
   }
 };
@@ -654,7 +654,6 @@ const getStoppedProperties = async (req, res) => {
 
     res.status(200).json({ message: 'Stopped properties fetched successfully', data: properties });
   } catch (error) {
-    console.error('Error fetching stopped properties:', error);
     res.status(500).json({ error: 'Failed to fetch stopped properties: ' + error.message });
   }
 };

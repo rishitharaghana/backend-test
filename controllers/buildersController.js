@@ -8,7 +8,7 @@ const queryAsync = util.promisify(pool.query).bind(pool);
 const getBuilderQueries = async (req, res) => {
   const { admin_user_id, admin_user_type } = req.query;
 
-  // Validate query parameters
+ 
   if (
     !admin_user_id ||
     isNaN(parseInt(admin_user_id)) ||
@@ -77,7 +77,7 @@ const getBuilderQueries = async (req, res) => {
       queries,
     });
   } catch (error) {
-    console.error('Error fetching builder queries:', error);
+   
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch builder queries: ' + error.message,
@@ -89,9 +89,7 @@ const getBuilderQueries = async (req, res) => {
 
 
 const createBuilderQuery = async (req, res) => {
-  const { name, number, message, admin_user_id,admin_user_type, added_user_id, added_user_type } = req.body;
-
-  
+  const { name, number, message, admin_user_id,admin_user_type, added_user_id, added_user_type } = req.body;  
   if (
     !name ||
     !number ||
@@ -140,7 +138,7 @@ const createBuilderQuery = async (req, res) => {
   }
 
   try {
-    // Validate admin user (admin_user_id = 1, admin_user_type = 1)
+   
     const adminUserCheck = await queryAsync(
       'SELECT id, user_type FROM crm_users WHERE id = ? AND user_type = ?',
       [parseInt(admin_user_id), parseInt(admin_user_type)]
@@ -152,7 +150,7 @@ const createBuilderQuery = async (req, res) => {
       });
     }
 
-    // Validate added user (added_user_id, added_user_type = 2)
+ 
     const addedUserCheck = await queryAsync(
       'SELECT id, user_type FROM crm_users WHERE id = ? AND user_type = ?',
       [parseInt(added_user_id), parseInt(added_user_type)]
@@ -164,7 +162,7 @@ const createBuilderQuery = async (req, res) => {
       });
     }
 
-    // Insert query
+    
     const created_date = moment().format('YYYY-MM-DD');
     const query = `
       INSERT INTO builder_queries (
@@ -190,7 +188,7 @@ const createBuilderQuery = async (req, res) => {
       query_id: result.insertId,
     });
   } catch (error) {
-    console.error('Error creating builder query:', error);
+  
     res.status(500).json({
       status: 'error',
       message: 'Failed to create builder query: ' + error.message,

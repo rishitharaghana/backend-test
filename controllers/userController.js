@@ -48,7 +48,7 @@ const insertCrmUser = async (req, res) => {
             ifsc_code
         } = req.body;
 
-        // Enhanced validation
+       
         if (
             !user_type ||
             !name ||
@@ -77,7 +77,7 @@ const insertCrmUser = async (req, res) => {
             typeof created_user_id === "undefined" ||
             typeof created_user_type === "undefined"
         ) {
-            console.log("Missing fields:", req.body);
+          
             return res.status(400).json({ error: "Missing or undefined required user fields" });
         }
 
@@ -124,8 +124,6 @@ const insertCrmUser = async (req, res) => {
             }
 
             const creatorUserType = creatorResult[0].user_type;
-
-            // Permission checks
             if (creatorUserType === 1) {
                 if (!validUserTypes.includes(parseInt(user_type))) {
                     return res.status(400).json({ error: "Invalid user_type for Admin" });
@@ -179,9 +177,6 @@ const insertCrmUser = async (req, res) => {
                 ifsc_code || null,
                 company_logo || null,
             ];
-
-            console.log("Values array:", values, "Length:", values.length);
-
             await queryAsync("START TRANSACTION");
             const userResult = await queryAsync(
                 `INSERT INTO crm_users (
@@ -228,7 +223,7 @@ const editCrmUser = async (req, res) => {
         }
 
         try {
-            // Check if user to edit exists
+            
             const userResult = await queryAsync('SELECT user_type, created_user_id FROM crm_users WHERE id = ?', [parseInt(id)]);
             if (!userResult.length) {
                 return res.status(404).json({ error: 'User not found' });
@@ -509,7 +504,7 @@ const updateUserStatus = async (req,res)=>{
 const getUserTypesByBuilder = async (req, res) => {
     let { admin_user_id, emp_user_id, emp_user_type } = req.query;
 
-    // Validate admin_user_id
+   
     if (!admin_user_id || isNaN(parseInt(admin_user_id))) {
         return res.status(400).json({ error: 'Valid admin_user_id is required' });
     }
@@ -518,7 +513,7 @@ const getUserTypesByBuilder = async (req, res) => {
         let query = `SELECT * FROM crm_users WHERE created_user_id = ?`;
         let params = [parseInt(admin_user_id)];
 
-        // Handle emp_user_type filter
+      
         if (emp_user_type) {
             const parsedEmpUserType = parseInt(emp_user_type.trim());
             if (!isNaN(parsedEmpUserType)) {
@@ -527,7 +522,7 @@ const getUserTypesByBuilder = async (req, res) => {
             }
         }
 
-        // Handle emp_user_id filter
+       
         if (emp_user_id) {
             const empUserIdArray = emp_user_id.split(',').map(i => parseInt(i.trim())).filter(n => !isNaN(n));
             if (empUserIdArray.length > 0) {
@@ -581,8 +576,6 @@ const getUserTypesCount = async (req, res) => {
 
   try {
     let result = [];
-
-    // Validate admin_user_type and admin_user_id
     if (!admin_user_type || isNaN(parseInt(admin_user_type))) {
       return res.status(400).json({ error: 'admin_user_type is required and must be a valid integer' });
     }
@@ -645,8 +638,6 @@ const getUserTypesCount = async (req, res) => {
     ) {
       const parsedEmpId = parseInt(emp_id);
       const parsedEmpUserType = parseInt(emp_user_type);
-
-      // Validate emp_user_type is one of [3, 4, 5, 6, 7]
       if (![3, 4, 5, 6, 7].includes(parsedEmpUserType)) {
         return res.status(400).json({
           error: 'Invalid emp_user_type. Must be one of 3, 4, 5, 6, or 7',

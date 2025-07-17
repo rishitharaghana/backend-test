@@ -16,7 +16,7 @@ const getStates = async (req, res) => {
       states
     });
   } catch (error) {
-    console.error('Error fetching states:', error);
+   
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch states: ' + error.message,
@@ -49,7 +49,6 @@ const getCitiesByState = async (req, res) => {
       cities
     });
   } catch (error) {
-    console.error('Error fetching cities:', error);
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch cities: ' + error.message,
