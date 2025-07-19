@@ -222,7 +222,7 @@ const insertProperty = async (req, res) => {
                             [
                                 property_id,
                                 place.title,
-                                parseFloat(place.distance).toString(),
+                                place.distance,
                                 currentTimestamp
                             ]
                         );
@@ -520,7 +520,7 @@ const editProperty = async (req, res) => {
                             [
                                 parseInt(property_id),
                                 place.title,
-                                parseFloat(place.distance).toString(),
+                                place.distance,
                                 currentTimestamp
                             ]
                         );
