@@ -24,6 +24,7 @@ const loginUser = async (req,res) => {
         }
         
         const user = userResult[0];
+        console.log("user: ", user);
         if (user.status !== 1){
             return res.status(403).json({ error: 'Account is not approved' });
         }

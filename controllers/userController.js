@@ -514,7 +514,7 @@ const getUserTypesByBuilder = async (req, res) => {
         if (emp_user_type) {
             const parsedEmpUserType = parseInt(emp_user_type.trim());
             if (!isNaN(parsedEmpUserType)) {
-                query += ` AND user_type = ?`;
+                query += ` AND user_type = ? AND status=1`;
                 params.push(parsedEmpUserType);
             }
         }
