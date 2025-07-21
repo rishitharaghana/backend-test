@@ -438,6 +438,7 @@ const getLeadsChannelPartner = async (req, res) => {
     }
   }
   try {
+    
     let query = `
       SELECT l.*, ls.status_name,p.state,p.city
       FROM leads l 
@@ -445,11 +446,12 @@ const getLeadsChannelPartner = async (req, res) => {
       JOIN property p ON l.interested_project_id = p.property_id
       WHERE l.lead_added_user_type = ? AND l.lead_added_user_id = ? AND l.booked = 'No' AND l.lead_source_user_id = ?
     `;
-    const queryParams = [
+    const queryParams = [ 
       lead_added_user_type,
       lead_added_user_id,
       lead_source_user_id,
     ];
+    
     if (status_id) {
       if (parsedStatusId === 0) {
         //today leads : leads created today
@@ -466,7 +468,7 @@ const getLeadsChannelPartner = async (req, res) => {
       }
     }
     if (assigned_user_type && assigned_id) {
-      query += ` AND l.assigned_user_type = ? AND l.assigned_id = ?`;
+      query += ` AND l.assigned_user_type = ? OR l.assigned_id = ?`;
       queryParams.push(assigned_user_type, assigned_id);
     }
     query += ` ORDER BY l.created_date DESC, l.created_time DESC`;
@@ -534,7 +536,7 @@ const getEmpLeads = async (req, res) => {
     const queryParams = [
       lead_added_user_type,
       lead_added_user_id,
-      lead_source_user_id,
+      lead_source_user_id,  
     ];
     if (status_id) {
       if (parsedStatusId === 0) {
@@ -555,6 +557,7 @@ const getEmpLeads = async (req, res) => {
       query += ` AND l.assigned_user_type = ? AND l.assigned_id = ?`;
       queryParams.push(assigned_user_type, assigned_id);
     }
+    
     query += ` ORDER BY l.created_date DESC, l.created_time DESC`;
     const results = await queryAsync(query, queryParams);
     if (results.length === 0) {
