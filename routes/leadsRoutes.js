@@ -1,5 +1,5 @@
 const express = require('express');
-const { getLeadsByUser, insertLead, assignLeadToEmployee, updateLeadByEmployee, getLeadUpdatesByLeadId, getBookedLeads, getAllLeadSource, getAllLeadStatus, updateBookingDone } = require('../controllers/leadsController');
+const { getLeadsByUser, insertLead, assignLeadToEmployee, updateLeadByEmployee, getLeadUpdatesByLeadId, getBookedLeads, getAllLeadSource, getAllLeadStatus, updateBookingDone, getLeadsChannelPartner } = require('../controllers/leadsController');
 const { authenticateToken } = require('../middlewares/authenticate');
 const router = express.Router();
 
@@ -12,5 +12,11 @@ router.get('/leads/bookedleads',authenticateToken,getBookedLeads);
 router.get('/leads/leadsource',authenticateToken,getAllLeadSource);
 router.get('/leads/leadstatus',authenticateToken,getAllLeadStatus);
 router.post('/leads/bookingdone',authenticateToken,updateBookingDone)
+
+router.get(
+  "/leads/getLeadsChannelPartner",
+  authenticateToken,
+  getLeadsChannelPartner
+);
 
 module.exports = router;

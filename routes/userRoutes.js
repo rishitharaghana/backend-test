@@ -13,4 +13,6 @@ router.get('/getUsersTypesByBuilder',authenticateToken,getUserTypesByBuilder);
 router.get('/getTypesCount',authenticateToken,getUserTypesCount);
 router.get('/getuserprofile',authenticateToken,getUserProfile);
 
+
+
 module.exports = router;
