@@ -17,10 +17,11 @@ app.use(express.json());
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3001',
+  'https://crm.mntechs.com',
   'http://localhost:5174',
    'http://localhost:5175', 
   'https://df01-110-235-236-218.ngrok-free.app',
-  "", 
+  
 ];
 
 
@@ -38,15 +39,11 @@ const corsOptions = {
   allowedHeaders: 'Origin, X-Requested-With, Content-Type, Accept, Authorization, ngrok-skip-browser-warning', // Include ngrok-skip-browser-warning
   exposedHeaders: ['Content-Disposition'],
 };
-
-
 app.use(cors(corsOptions));
-
 
 app.get('/', (req, res) => {
   res.send('Hello world');
 });
-
 
 app.use('/api/v1', propertyRouter);
 app.use('/api/v1', authRouter);
