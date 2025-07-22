@@ -57,7 +57,7 @@ app.use('/api/v1',builderRouter);
 app.use(uploadRouter);
 
 // Start server
-const port = 3000;
+const port = 3002;
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
