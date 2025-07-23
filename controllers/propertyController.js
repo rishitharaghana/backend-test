@@ -16,7 +16,6 @@ const upload = createMulterInstance(uploadDir, allowedTypes, {
   fileSize: 20 * 1024 * 1024,
 });
 
-
 const queryAsync = util.promisify(pool.query).bind(pool);
 
 const insertProperty = async (req, res) => {
@@ -336,7 +335,7 @@ const insertProperty = async (req, res) => {
         );
       }
       await queryAsync("COMMIT");
-      const baseUrl = `http://localhost:3002/uploads/`;
+      const baseUrl = `https://crmapi.mntechs.com/uploads/`;
       res.status(201).json({
         message: "Property inserted successfully",
         property_id,
@@ -717,7 +716,7 @@ const editProperty = async (req, res) => {
       }
 
       await queryAsync("COMMIT");
-      const baseUrl = `http://localhost:3002/uploads/`
+      const baseUrl = `https://crmapi.mntechs.com/uploads/`
       res.status(200).json({
         message: "Property updated successfully",
         property_id,
@@ -773,8 +772,7 @@ const getPropertyById = async (req, res) => {
       `SELECT payment_mode FROM payment_modes WHERE property_id = ?`,
       [parsedPropertyId]
     );
-
-    const baseUrl = `http://localhost:3002/uploads/`; // Adjust for production
+    const baseUrl = `https://crmapi.mntechs.com/uploads/`; // Adjust for production
     const property = {
       ...propertyResult[0],
       brochure: propertyResult[0].brochure
@@ -799,6 +797,7 @@ const getPropertyById = async (req, res) => {
       })),
       payment_modes: paymentModesResult.map((row) => row.payment_mode),
     };
+
 
     res.status(200).json(property);
   } catch (error) {
@@ -860,7 +859,7 @@ const getAllProperties = async (req, res) => {
       });
     });
 
-    const baseUrl = `http://localhost:3002/uploads/`;
+    const baseUrl = `https://crmapi.mntechs.com/uploads/`;
     const properties = propertiesResult.map((property) => ({
       ...property,
        property_image: property.property_image ? `${baseUrl}${property.property_image}` : null, 
@@ -934,7 +933,7 @@ const ongoingProject = async (req, res) => {
         create_date: row.create_date,
       });
     });
-    const baseUrl = `http://localhost:3002/uploads/`; 
+    const baseUrl = `https://crmapi.mntechs.com/uploads/`; 
     const properties = propertiesResult.map((property) => ({
       ...property,
        property_image: property.property_image
@@ -1011,7 +1010,7 @@ const getUpcomingProperties = async (req, res) => {
       });
     });
 
-        const baseUrl = `http://localhost:3002/uploads/`; 
+        const baseUrl = `https://crmapi.mntechs.com/uploads/`; 
     const properties = propertiesResult.map((property) => ({
       ...property,
        property_image: property.property_image
@@ -1140,7 +1139,7 @@ const getStoppedProperties = async (req, res) => {
         create_date: row.create_date,
       });
     });
-    const baseUrl = `http://localhost:3002/uploads/`; 
+    const baseUrl = `https://crmapi.mntechs.com/uploads/`; 
     const properties = propertiesResult.map((property) => ({
       ...property,
        property_image: property.property_image
