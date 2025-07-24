@@ -336,6 +336,8 @@ const insertProperty = async (req, res) => {
       }
       await queryAsync("COMMIT");
       const baseUrl = `https://crmapi.mntechs.com/uploads/`;
+      //  const baseUrl = `http://localhost:3002/uploads/`;
+
       res.status(201).json({
         message: "Property inserted successfully",
         property_id,
@@ -717,6 +719,8 @@ const editProperty = async (req, res) => {
 
       await queryAsync("COMMIT");
       const baseUrl = `https://crmapi.mntechs.com/uploads/`
+      //  const baseUrl = `http://localhost:3002/uploads/`;
+
       res.status(200).json({
         message: "Property updated successfully",
         property_id,
@@ -773,6 +777,8 @@ const getPropertyById = async (req, res) => {
       [parsedPropertyId]
     );
     const baseUrl = `https://crmapi.mntechs.com/uploads/`; // Adjust for production
+    //  const baseUrl = `http://localhost:3002/uploads/`;
+
     const property = {
       ...propertyResult[0],
       brochure: propertyResult[0].brochure
@@ -860,6 +866,9 @@ const getAllProperties = async (req, res) => {
     });
 
     const baseUrl = `https://crmapi.mntechs.com/uploads/`;
+    //  const baseUrl = `http://localhost:3002/uploads/`;
+
+
     const properties = propertiesResult.map((property) => ({
       ...property,
        property_image: property.property_image ? `${baseUrl}${property.property_image}` : null, 
@@ -934,6 +943,9 @@ const ongoingProject = async (req, res) => {
       });
     });
     const baseUrl = `https://crmapi.mntechs.com/uploads/`; 
+    //  const baseUrl = `http://localhost:3002/uploads/`;
+
+
     const properties = propertiesResult.map((property) => ({
       ...property,
        property_image: property.property_image
@@ -1011,6 +1023,8 @@ const getUpcomingProperties = async (req, res) => {
     });
 
         const baseUrl = `https://crmapi.mntechs.com/uploads/`; 
+        //  const baseUrl = `http://localhost:3002/uploads/`;
+
     const properties = propertiesResult.map((property) => ({
       ...property,
        property_image: property.property_image
@@ -1139,7 +1153,9 @@ const getStoppedProperties = async (req, res) => {
         create_date: row.create_date,
       });
     });
-    const baseUrl = `https://crmapi.mntechs.com/uploads/`; 
+    const baseUrl = `https://crmapi.mntechs.com/uploads/`;
+    //  const baseUrl = `http://localhost:3002/uploads/`;
+ 
     const properties = propertiesResult.map((property) => ({
       ...property,
        property_image: property.property_image

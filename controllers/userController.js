@@ -163,8 +163,8 @@ const insertCrmUser = async (req, res) => {
       }
 
      
-      const baseUrl = `http://localhost:3002/uploads/`; // Adjust for production
-//  const baseUrl = `https://crmapi.mntechs.com/uploads/`;
+      // const baseUrl = `http://localhost:3002/uploads/`; // Adjust for production
+ const baseUrl = `https://crmapi.mntechs.com/uploads/`;
       const photo = req.files?.["photo"]?.[0]?.path
         ? `${baseUrl}${path.basename(req.files["photo"][0].path)}`
         : null;
