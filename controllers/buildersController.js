@@ -39,6 +39,7 @@ const getBuilderQueries = async (req, res) => {
         bq.number,
         bq.message,
         bq.created_date,
+        bq.created_time,
         bq.admin_user_id,
         bq.admin_user_type,
         cu_admin.name AS admin_name,
@@ -54,7 +55,7 @@ const getBuilderQueries = async (req, res) => {
         AND bq.admin_user_type = ?
         AND bq.added_user_type = 2
       ORDER BY 
-        bq.created_date DESC
+        bq.created_time DESC
     `;
     const rows = await queryAsync(query, [parseInt(admin_user_id), parseInt(admin_user_type)]);
     const queries = rows.map((row) => ({
@@ -63,6 +64,7 @@ const getBuilderQueries = async (req, res) => {
       number: row.number,
       message: row.message,
       created_date: row.created_date,
+      created_time: row.created_time,
       admin_user_id: row.admin_user_id,
       admin_user_type: row.admin_user_type,
       admin_name: row.admin_name,
@@ -164,16 +166,18 @@ const createBuilderQuery = async (req, res) => {
 
     
     const created_date = moment().format('YYYY-MM-DD');
+    const created_time = moment().format("HH:mm:ss")
     const query = `
       INSERT INTO builder_queries (
-        name, number, message, created_date, admin_user_id, admin_user_type, added_user_id, added_user_type
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        name, number, message, created_date,created_time, admin_user_id, admin_user_type, added_user_id, added_user_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
     const values = [
       name,
       number,
       message,
       created_date,
+      created_time,
       parseInt(admin_user_id),
       parseInt(admin_user_type), 
       parseInt(added_user_id),
